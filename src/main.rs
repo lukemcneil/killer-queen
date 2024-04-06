@@ -4,6 +4,7 @@ mod player;
 
 use animation::AnimationPlugin;
 use bevy::{prelude::*, window::WindowResolution};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 use platforms::PlatformsPlugin;
 use player::PlayerPlugin;
@@ -38,6 +39,7 @@ fn main() {
             PlayerPlugin,
             AnimationPlugin,
         ))
+        .add_plugins(WorldInspectorPlugin::new())
         .add_systems(Startup, setup)
         .run();
 }

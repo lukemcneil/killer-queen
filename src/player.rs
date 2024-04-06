@@ -103,6 +103,7 @@ fn setup(
             },
             ..Default::default()
         })
+        .insert(Name::new("Player"))
         .insert(InputManagerBundle::with_map(input_map))
         .insert(RigidBody::Dynamic)
         .insert(GravityScale(40.0))
