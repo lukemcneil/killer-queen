@@ -13,6 +13,7 @@ const SPRITESHEET_ROWS: usize = 8;
 
 const SPRITE_TILE_WIDTH: f32 = 128.0;
 const SPRITE_TILE_HEIGHT: f32 = 256.0;
+const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 148.0;
 
 const SPRITE_RENDER_WIDTH: f32 = 64.0;
 const SPRITE_RENDER_HEIGHT: f32 = 128.0;
@@ -101,6 +102,19 @@ fn setup(
                 ),
                 ..Default::default()
             },
+            sprite: Sprite {
+                rect: Some(Rect {
+                    min: Vec2 {
+                        x: 0.0,
+                        y: SPRITE_TILE_HEIGHT - SPRITE_TILE_ACTUAL_HEIGHT,
+                    },
+                    max: Vec2 {
+                        x: SPRITE_TILE_WIDTH,
+                        y: SPRITE_TILE_HEIGHT,
+                    },
+                }),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .insert(Name::new("Player"))
@@ -109,7 +123,7 @@ fn setup(
         .insert(GravityScale(40.0))
         .insert(Collider::cuboid(
             SPRITE_TILE_WIDTH / 2.0,
-            SPRITE_TILE_HEIGHT / 2.0,
+            SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
         ))
         .insert(Velocity::default())
         .insert(Direction::Right)
