@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
+use leafwing_input_manager::prelude::*;
 
 use crate::{animation::Animation, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
 
@@ -27,19 +28,27 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            Update,
-            (
-                movement,
-                jump,
-                update_direction.after(movement),
-                update_sprite_direction,
-                apply_movement_animation,
-                apply_idle_sprite.after(movement),
-                apply_jump_sprite,
-            ),
-        );
+        app.add_plugins(InputManagerPlugin::<Action>::default())
+            .add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (
+                    movement,
+                    jump,
+                    update_direction.after(movement),
+                    update_sprite_direction,
+                    apply_movement_animation,
+                    apply_idle_sprite.after(movement),
+                    apply_jump_sprite,
+                ),
+            );
     }
+}
+
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
+enum Action {
+    Move,
+    Jump,
 }
 
 #[derive(Component)]
@@ -63,6 +72,19 @@ fn setup(
     );
     let atlas_handle = atlases.add(texture_atlas);
 
+    let mut input_map = InputMap::default();
+    input_map.insert(Action::Jump, GamepadButtonType::South);
+    input_map.insert(Action::Jump, KeyCode::KeyW);
+    input_map.insert(Action::Jump, KeyCode::Space);
+    input_map.insert(Action::Jump, KeyCode::ArrowUp);
+    input_map.insert(
+        Action::Move,
+        SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.1),
+    );
+    input_map.insert(Action::Move, VirtualAxis::ad());
+    input_map.insert(Action::Move, VirtualAxis::horizontal_arrow_keys());
+    input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
+
     commands
         .spawn(SpriteSheetBundle {
             texture,
@@ -81,6 +103,7 @@ fn setup(
             },
             ..Default::default()
         })
+        .insert(InputManagerBundle::with_map(input_map))
         .insert(RigidBody::Dynamic)
         .insert(GravityScale(40.0))
         .insert(Collider::cuboid(
@@ -96,30 +119,22 @@ fn setup(
         });
 }
 
-fn movement(input: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Velocity, With<Sprite>>) {
-    let mut velocity = query.single_mut();
+fn movement(mut query: Query<(&ActionState<Action>, &mut Velocity), With<Sprite>>) {
+    let (action_state, mut velocity) = query.single_mut();
 
     let mut new_x_velocity = 0.0;
 
-    if input.pressed(KeyCode::KeyD) {
-        new_x_velocity = PLAYER_VELOCITY_X;
-    }
-
-    if input.pressed(KeyCode::KeyA) {
-        new_x_velocity = -PLAYER_VELOCITY_X;
+    if action_state.pressed(&Action::Move) {
+        new_x_velocity = action_state.clamped_value(&Action::Move) * PLAYER_VELOCITY_X;
     }
 
     velocity.linvel.x = new_x_velocity;
 }
 
-fn jump(input: Res<ButtonInput<KeyCode>>, mut query: Query<&mut Velocity>) {
-    if query.is_empty() {
-        return;
-    }
+fn jump(mut query: Query<(&ActionState<Action>, &mut Velocity)>) {
+    let (action_state, mut velocity) = query.single_mut();
 
-    let mut velocity = query.single_mut();
-
-    if input.just_pressed(KeyCode::KeyW) {
+    if action_state.just_pressed(&Action::Jump) {
         velocity.linvel.y = 1500.0;
     }
 }
