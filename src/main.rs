@@ -34,7 +34,7 @@ fn main() {
         }))
         .add_plugins((
             RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(200.0),
-            RapierDebugRenderPlugin::default(),
+            // RapierDebugRenderPlugin::default(),
             PlatformsPlugin,
             PlayerPlugin,
             AnimationPlugin,
