@@ -1,0 +1,3 @@
+[submodule "leafwing-input-manager"]
+	path = leafwing-input-manager
+	url = git@github.com:Leafwing-Studios/leafwing-input-manager.git
