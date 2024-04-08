@@ -6,7 +6,15 @@ use leafwing_input_manager::prelude::*;
 
 use crate::{animation::Animation, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
 
-const PLAYER_VELOCITY_X: f32 = 400.0;
+const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
+const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
+const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
+const PLAYER_JUMP_IMPULSE: f32 = 30.0;
+const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 0.15;
+const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 0.08;
+const PLAYER_FRICTION_GROUND: f32 = 0.0005;
+const PLAYER_FRICTION_AIR: f32 = 0.0001;
+const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 
 const SPRITESHEET_COLS: usize = 7;
 const SPRITESHEET_ROWS: usize = 8;
@@ -15,8 +23,8 @@ const SPRITE_TILE_WIDTH: f32 = 128.0;
 const SPRITE_TILE_HEIGHT: f32 = 256.0;
 const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
 
-const SPRITE_RENDER_WIDTH: f32 = 64.0;
-const SPRITE_RENDER_HEIGHT: f32 = 128.0;
+const SPRITE_RENDER_WIDTH: f32 = 32.0;
+const SPRITE_RENDER_HEIGHT: f32 = 64.0;
 
 const SPRITE_IDX_STAND: usize = 28;
 const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
@@ -36,10 +44,10 @@ impl Plugin for PlayerPlugin {
                 (
                     (
                         movement,
+                        friction,
                         jump,
                         update_sprite_direction,
                         apply_movement_animation,
-                        update_direction.after(movement),
                         apply_idle_sprite.after(movement),
                         apply_jump_sprite,
                         join,
@@ -108,7 +116,7 @@ fn join(
                 input_map.insert(Action::Jump, GamepadButtonType::South);
                 input_map.insert(
                     Action::Move,
-                    SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.1),
+                    SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
                 );
                 input_map.insert(Action::Disconnect, GamepadButtonType::Select);
                 input_map.set_gamepad(gamepad);
@@ -152,12 +160,13 @@ fn join(
                     .insert(Name::new("Player"))
                     .insert(InputManagerBundle::with_map(input_map))
                     .insert(RigidBody::Dynamic)
-                    .insert(GravityScale(40.0))
+                    .insert(GravityScale(PLAYER_GRAVITY_SCALE))
                     .insert(Collider::cuboid(
                         SPRITE_TILE_WIDTH / 4.0,
                         SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
                     ))
                     .insert(Velocity::default())
+                    .insert(ExternalImpulse::default())
                     .insert(Direction::Right)
                     .insert(LockedAxes::ROTATION_LOCKED)
                     .insert(Friction {
@@ -186,15 +195,52 @@ fn join(
     }
 }
 
-fn movement(mut query: Query<(&ActionState<Action>, &mut Velocity), With<Sprite>>) {
-    for (action_state, mut velocity) in query.iter_mut() {
-        let mut new_x_velocity = 0.0;
-
+fn movement(
+    mut query: Query<
+        (
+            Entity,
+            &ActionState<Action>,
+            &mut ExternalImpulse,
+            &mut Velocity,
+        ),
+        With<Player>,
+    >,
+    mut commands: Commands,
+) {
+    for (player, action_state, mut impulse, mut velocity) in query.iter_mut() {
         if action_state.pressed(&Action::Move) {
-            new_x_velocity = action_state.clamped_value(&Action::Move) * PLAYER_VELOCITY_X;
+            let joystick_value = action_state.clamped_value(&Action::Move);
+            if joystick_value > 0.0 {
+                commands.entity(player).insert(Direction::Right);
+            } else if joystick_value < 0.0 {
+                commands.entity(player).insert(Direction::Left);
+            }
+            if is_in_air(&velocity) {
+                impulse.impulse.x += joystick_value * PLAYER_MOVEMENT_IMPULSE_AIR;
+            } else {
+                impulse.impulse.x += joystick_value * PLAYER_MOVEMENT_IMPULSE_GROUND;
+            }
+        } else {
+            // stop the player from moving if joystick is not being pressed and moving slowly
+            if velocity.linvel.x.abs() < PLAYER_MIN_VELOCITY_X {
+                velocity.linvel.x = 0.0;
+            }
         }
 
-        velocity.linvel.x = new_x_velocity;
+        velocity.linvel.x = velocity
+            .linvel
+            .x
+            .clamp(-PLAYER_MAX_VELOCITY_X, PLAYER_MAX_VELOCITY_X);
+    }
+}
+
+fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity), With<Player>>) {
+    for (mut impulse, velocity) in query.iter_mut() {
+        if is_in_air(velocity) {
+            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_AIR;
+        } else {
+            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_GROUND;
+        }
     }
 }
 
@@ -214,11 +260,16 @@ fn disconnect(
     }
 }
 
-fn jump(mut query: Query<(&ActionState<Action>, &mut Velocity)>) {
-    for (action_state, mut velocity) in query.iter_mut() {
+fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &mut Velocity)>) {
+    for (action_state, mut impulse, mut velocity) in query.iter_mut() {
         if action_state.just_pressed(&Action::Jump) {
-            velocity.linvel.y = 1500.0;
+            impulse.impulse.y += PLAYER_JUMP_IMPULSE;
         }
+
+        velocity.linvel.y = velocity
+            .linvel
+            .y
+            .clamp(-PLAYER_MAX_VELOCITY_Y, PLAYER_MAX_VELOCITY_Y);
     }
 }
 
@@ -226,12 +277,20 @@ fn is_close_to_zero(num: f32) -> bool {
     num.abs() < 10.0
 }
 
+fn is_running(velocity: &Velocity) -> bool {
+    !is_close_to_zero(velocity.linvel.x)
+}
+
+fn is_in_air(velocity: &Velocity) -> bool {
+    !is_close_to_zero(velocity.linvel.y)
+}
+
 fn apply_movement_animation(
     mut commands: Commands,
     query: Query<(Entity, &Velocity), Without<Animation>>,
 ) {
     for (player, velocity) in query.iter() {
-        if velocity.linvel.x != 0.0 && is_close_to_zero(velocity.linvel.y) {
+        if is_running(velocity) && !is_in_air(velocity) {
             commands
                 .entity(player)
                 .insert(Animation::new(SPRITE_IDX_WALKING, CYCLE_DELAY));
@@ -244,7 +303,7 @@ fn apply_idle_sprite(
     mut query: Query<(Entity, &Velocity, &mut TextureAtlas)>,
 ) {
     for (player, velocity, mut sprite) in query.iter_mut() {
-        if velocity.linvel.x == 0.0 && is_close_to_zero(velocity.linvel.y) {
+        if !is_running(velocity) && !is_in_air(velocity) {
             commands.entity(player).remove::<Animation>();
             sprite.index = SPRITE_IDX_STAND
         }
@@ -256,23 +315,13 @@ fn apply_jump_sprite(
     mut query: Query<(Entity, &Velocity, &mut TextureAtlas)>,
 ) {
     for (player, velocity, mut sprite) in query.iter_mut() {
-        if !is_close_to_zero(velocity.linvel.y) {
+        if is_in_air(velocity) {
             commands.entity(player).remove::<Animation>();
             if velocity.linvel.y > 0.0 {
                 sprite.index = SPRITE_IDX_JUMP
             } else {
                 sprite.index = SPRITE_IDX_FALL
             }
-        }
-    }
-}
-
-fn update_direction(mut commands: Commands, query: Query<(Entity, &Velocity)>) {
-    for (player, velocity) in query.iter() {
-        if velocity.linvel.x > 0.0 {
-            commands.entity(player).insert(Direction::Right);
-        } else if velocity.linvel.x < 0.0 {
-            commands.entity(player).insert(Direction::Left);
         }
     }
 }
@@ -291,8 +340,8 @@ fn update_sprite_direction(
                 .get_mut(child.clone())
                 .expect("player should have collider");
             transform.translation.x = match direction {
-                Direction::Right => -SPRITE_RENDER_WIDTH / 2.0,
-                Direction::Left => SPRITE_RENDER_WIDTH / 2.0,
+                Direction::Right => -SPRITE_TILE_WIDTH / 4.0,
+                Direction::Left => SPRITE_TILE_WIDTH / 4.0,
             };
         }
     }
