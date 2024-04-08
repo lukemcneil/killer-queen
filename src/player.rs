@@ -149,7 +149,7 @@ fn join(
                     .insert(RigidBody::Dynamic)
                     .insert(GravityScale(40.0))
                     .insert(Collider::cuboid(
-                        SPRITE_TILE_WIDTH / 2.0,
+                        SPRITE_TILE_WIDTH / 4.0,
                         SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
                     ))
                     .insert(Velocity::default())
