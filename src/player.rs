@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy::{prelude::*, utils::HashMap};
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
+use rand::{thread_rng, Rng};
 
 use crate::{animation::Animation, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
 
@@ -86,6 +87,15 @@ struct Player {
 #[derive(Component)]
 struct PlayerBackCollider;
 
+fn random_color() -> Color {
+    let mut rng = thread_rng();
+    Color::hsl(
+        rng.gen_range(0.0..360.0),
+        rng.gen_range(0.6..1.0),
+        rng.gen_range(0.4..0.6),
+    )
+}
+
 fn join(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
@@ -152,8 +162,10 @@ fn join(
                                     y: SPRITE_TILE_HEIGHT,
                                 },
                             }),
+                            color: random_color(),
                             ..Default::default()
                         },
+
                         ..Default::default()
                     })
                     .insert(Player { gamepad })
