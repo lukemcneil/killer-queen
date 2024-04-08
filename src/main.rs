@@ -47,19 +47,45 @@ fn main() {
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
-    commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: COLOR_FLOOR,
+    for y in [
+        WINDOW_BOTTOM_Y + FLOOR_THICKNESS / 2.0,
+        -(WINDOW_BOTTOM_Y + FLOOR_THICKNESS / 2.0),
+    ] {
+        commands
+            .spawn(SpriteBundle {
+                sprite: Sprite {
+                    color: COLOR_FLOOR,
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(0.0, y, 0.0),
+                    scale: Vec3::new(WINDOW_WIDTH, FLOOR_THICKNESS, 1.0),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0.0, WINDOW_BOTTOM_Y + (FLOOR_THICKNESS / 2.0), 0.0),
-                scale: Vec3::new(WINDOW_WIDTH, FLOOR_THICKNESS, 1.0),
+            })
+            .insert(RigidBody::Fixed)
+            .insert(Collider::cuboid(0.5, 0.5));
+    }
+
+    for x in [
+        WINDOW_LEFT_X + FLOOR_THICKNESS / 2.0,
+        -(WINDOW_LEFT_X + FLOOR_THICKNESS / 2.0),
+    ] {
+        commands
+            .spawn(SpriteBundle {
+                sprite: Sprite {
+                    color: COLOR_FLOOR,
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(x, 0.0, 0.0),
+                    scale: Vec3::new(FLOOR_THICKNESS, WINDOW_HEIGHT, 1.0),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RigidBody::Fixed)
-        .insert(Collider::cuboid(0.5, 0.5));
+            })
+            .insert(RigidBody::Fixed)
+            .insert(Collider::cuboid(0.5, 0.5));
+    }
 }

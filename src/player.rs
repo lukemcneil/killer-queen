@@ -44,8 +44,10 @@ impl Plugin for PlayerPlugin {
                         apply_jump_sprite,
                         join,
                     )
-                        .before(disconnect),
+                        .before(disconnect)
+                        .before(players_attack),
                     disconnect,
+                    players_attack,
                 ),
             );
     }
@@ -72,6 +74,9 @@ struct Player {
     // This gamepad is used to index each player
     gamepad: Gamepad,
 }
+
+#[derive(Component)]
+struct PlayerBackCollider;
 
 fn join(
     mut commands: Commands,
@@ -159,6 +164,18 @@ fn join(
                         coefficient: 0.0,
                         combine_rule: CoefficientCombineRule::Min,
                     })
+                    .with_children(|children| {
+                        children
+                            .spawn(Collider::ball(SPRITE_RENDER_WIDTH / 2.0))
+                            .insert(TransformBundle::from_transform(Transform::from_xyz(
+                                0.0,
+                                SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
+                                0.0,
+                            )))
+                            .insert(Sensor)
+                            .insert(ActiveEvents::COLLISION_EVENTS)
+                            .insert(PlayerBackCollider);
+                    })
                     .id();
 
                 // Insert the created player and its gamepad to the hashmap of joined players
@@ -191,7 +208,7 @@ fn disconnect(
             let player_entity = *joined_players.0.get(&player.gamepad).unwrap();
 
             // Despawn thea disconnected player and remove them from the joined player list
-            commands.entity(player_entity).despawn();
+            commands.entity(player_entity).despawn_recursive();
             joined_players.0.remove(&player.gamepad);
         }
     }
@@ -260,11 +277,54 @@ fn update_direction(mut commands: Commands, query: Query<(Entity, &Velocity)>) {
     }
 }
 
-fn update_sprite_direction(mut query: Query<(&mut Sprite, &Direction)>) {
-    for (mut sprite, direction) in query.iter_mut() {
+fn update_sprite_direction(
+    mut query: Query<(&mut Sprite, &Direction, &Children)>,
+    mut back_colliders: Query<&mut Transform, With<PlayerBackCollider>>,
+) {
+    for (mut sprite, direction, children) in query.iter_mut() {
         match direction {
             Direction::Right => sprite.flip_x = false,
             Direction::Left => sprite.flip_x = true,
+        }
+        for child in children {
+            let mut transform = back_colliders
+                .get_mut(child.clone())
+                .expect("player should have collider");
+            transform.translation.x = match direction {
+                Direction::Right => -SPRITE_RENDER_WIDTH / 2.0,
+                Direction::Left => SPRITE_RENDER_WIDTH / 2.0,
+            };
+        }
+    }
+}
+
+fn players_attack(
+    mut collision_events: EventReader<CollisionEvent>,
+    mut commands: Commands,
+    mut joined_players: ResMut<JoinedPlayers>,
+    collider_parents: Query<&Parent, With<PlayerBackCollider>>,
+    players: Query<&Player>,
+) {
+    for collision_event in collision_events.read() {
+        if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
+            let back_collider = if players.get(entity1.clone()).is_ok() {
+                entity2
+            } else if players.get(entity2.clone()).is_ok() {
+                entity1
+            } else {
+                // neither is a player, collision between sensors
+                continue;
+            };
+
+            if let Ok(killed_player) = collider_parents.get(back_collider.clone()) {
+                commands.entity(killed_player.get()).despawn_recursive();
+                joined_players.0.remove(
+                    &players
+                        .get(killed_player.get())
+                        .expect("killed should have player component")
+                        .gamepad,
+                );
+            }
         }
     }
 }
