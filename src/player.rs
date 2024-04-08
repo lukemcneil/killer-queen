@@ -34,14 +34,17 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 Update,
                 (
-                    movement,
-                    jump,
-                    update_direction.after(movement),
-                    update_sprite_direction,
-                    apply_movement_animation,
-                    apply_idle_sprite.after(movement),
-                    apply_jump_sprite,
-                    join,
+                    (
+                        movement,
+                        jump,
+                        update_sprite_direction,
+                        apply_movement_animation,
+                        update_direction.after(movement),
+                        apply_idle_sprite.after(movement),
+                        apply_jump_sprite,
+                        join,
+                    )
+                        .before(disconnect),
                     disconnect,
                 ),
             );
@@ -203,7 +206,7 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut Velocity)>) {
 }
 
 fn is_close_to_zero(num: f32) -> bool {
-    num.abs() < 0.00001
+    num.abs() < 10.0
 }
 
 fn apply_movement_animation(
