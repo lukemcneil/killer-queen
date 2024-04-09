@@ -3,7 +3,6 @@ use std::time::Duration;
 use bevy::{prelude::*, utils::HashMap};
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
-use rand::{thread_rng, Rng};
 
 use crate::{animation::Animation, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
 
@@ -97,15 +96,6 @@ struct Wings;
 #[derive(Component)]
 struct PlayerBackCollider;
 
-fn random_color() -> Color {
-    let mut rng = thread_rng();
-    Color::hsl(
-        rng.gen_range(0.0..360.0),
-        rng.gen_range(0.6..1.0),
-        rng.gen_range(0.4..0.6),
-    )
-}
-
 fn join(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
@@ -121,6 +111,8 @@ fn join(
             || button_inputs
                 .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::RightTrigger))
         {
+            let join_as_queen = button_inputs
+                .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger));
             // Make sure a player cannot join twice
             if !joined_players.0.contains_key(&gamepad) {
                 let texture: Handle<Image> = server.load("spritesheets/spritesheet_players.png");
@@ -173,7 +165,11 @@ fn join(
                                     y: SPRITE_TILE_HEIGHT,
                                 },
                             }),
-                            color: random_color(),
+                            color: if join_as_queen {
+                                Color::GOLD
+                            } else {
+                                Color::WHITE
+                            },
                             ..Default::default()
                         },
 
@@ -198,9 +194,7 @@ fn join(
                     },
                     ActiveEvents::CONTACT_FORCE_EVENTS,
                 ));
-                if button_inputs
-                    .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
-                {
+                if join_as_queen {
                     player.insert(Wings);
                 }
 
