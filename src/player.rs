@@ -193,6 +193,7 @@ fn join(
                         combine_rule: CoefficientCombineRule::Min,
                     },
                     ActiveEvents::CONTACT_FORCE_EVENTS,
+                    Ccd::enabled(),
                 ));
                 if join_as_queen {
                     player.insert(Wings);
