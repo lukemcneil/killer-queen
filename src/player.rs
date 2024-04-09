@@ -10,7 +10,8 @@ use crate::{animation::Animation, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
-const PLAYER_JUMP_IMPULSE: f32 = 30.0;
+const PLAYER_FLY_IMPULSE: f32 = 30.0;
+const PLAYER_JUMP_IMPULSE: f32 = 60.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 100.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 50.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
@@ -44,14 +45,19 @@ impl Plugin for PlayerPlugin {
                 Update,
                 (
                     (
-                        movement,
-                        friction,
-                        jump,
-                        update_sprite_direction,
-                        apply_movement_animation,
-                        apply_idle_sprite.after(movement),
-                        apply_jump_sprite,
-                        join,
+                        check_if_players_on_ground,
+                        (
+                            movement,
+                            friction,
+                            fly,
+                            jump,
+                            update_sprite_direction,
+                            apply_movement_animation,
+                            apply_idle_sprite.after(movement),
+                            apply_jump_sprite,
+                            join,
+                        )
+                            .after(check_if_players_on_ground),
                     )
                         .before(disconnect)
                         .before(players_attack),
@@ -82,7 +88,11 @@ enum Direction {
 struct Player {
     // This gamepad is used to index each player
     gamepad: Gamepad,
+    is_on_ground: bool,
 }
+
+#[derive(Component)]
+struct Wings;
 
 #[derive(Component)]
 struct PlayerBackCollider;
@@ -107,8 +117,9 @@ fn join(
     for gamepad in gamepads.iter() {
         // Join the game when both bumpers (L+R) on the controller are pressed
         // We drop down the Bevy's input to get the input from each gamepad
-        if button_inputs.pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
-            && button_inputs.pressed(GamepadButton::new(gamepad, GamepadButtonType::RightTrigger))
+        if button_inputs.just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
+            || button_inputs
+                .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::RightTrigger))
         {
             // Make sure a player cannot join twice
             if !joined_players.0.contains_key(&gamepad) {
@@ -131,8 +142,8 @@ fn join(
                 input_map.insert(Action::Disconnect, GamepadButtonType::Select);
                 input_map.set_gamepad(gamepad);
 
-                let player = commands
-                    .spawn(SpriteSheetBundle {
+                let mut player = commands.spawn((
+                    SpriteSheetBundle {
                         texture,
                         atlas: TextureAtlas {
                             layout: atlas_handle,
@@ -167,73 +178,80 @@ fn join(
                         },
 
                         ..Default::default()
-                    })
-                    .insert(Player { gamepad })
-                    .insert(Name::new("Player"))
-                    .insert(InputManagerBundle::with_map(input_map))
-                    .insert(RigidBody::Dynamic)
-                    .insert(GravityScale(PLAYER_GRAVITY_SCALE))
-                    .insert(Collider::cuboid(
-                        SPRITE_TILE_WIDTH / 4.0,
-                        SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
-                    ))
-                    .insert(Velocity::default())
-                    .insert(ExternalImpulse::default())
-                    .insert(Direction::Right)
-                    .insert(LockedAxes::ROTATION_LOCKED)
-                    .insert(Friction {
+                    },
+                    Player {
+                        gamepad,
+                        is_on_ground: false,
+                    },
+                    Name::new("Player"),
+                    InputManagerBundle::with_map(input_map),
+                    RigidBody::Dynamic,
+                    GravityScale(PLAYER_GRAVITY_SCALE),
+                    Collider::cuboid(SPRITE_TILE_WIDTH / 4.0, SPRITE_TILE_ACTUAL_HEIGHT / 2.0),
+                    Velocity::default(),
+                    ExternalImpulse::default(),
+                    Direction::Right,
+                    LockedAxes::ROTATION_LOCKED,
+                    Friction {
                         coefficient: 0.0,
                         combine_rule: CoefficientCombineRule::Min,
-                    })
-                    .with_children(|children| {
-                        children
-                            .spawn(Collider::ball(SPRITE_RENDER_WIDTH / 2.0))
-                            .insert(TransformBundle::from_transform(Transform::from_xyz(
-                                0.0,
-                                SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
-                                0.0,
-                            )))
-                            .insert(Sensor)
-                            .insert(ActiveEvents::COLLISION_EVENTS)
-                            .insert(PlayerBackCollider);
-                    })
-                    .id();
+                    },
+                    ActiveEvents::CONTACT_FORCE_EVENTS,
+                ));
+                if button_inputs
+                    .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
+                {
+                    player.insert(Wings);
+                }
+
+                player.with_children(|children| {
+                    children
+                        .spawn(Collider::ball(SPRITE_RENDER_WIDTH / 2.0))
+                        .insert(TransformBundle::from_transform(Transform::from_xyz(
+                            0.0,
+                            SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
+                            0.0,
+                        )))
+                        .insert(Sensor)
+                        .insert(ActiveEvents::COLLISION_EVENTS)
+                        .insert(PlayerBackCollider);
+                });
 
                 // Insert the created player and its gamepad to the hashmap of joined players
                 // Since uniqueness was already checked above, we can insert here unchecked
-                joined_players.0.insert_unique_unchecked(gamepad, player);
+                joined_players
+                    .0
+                    .insert_unique_unchecked(gamepad, player.id());
             }
         }
     }
 }
 
 fn movement(
-    mut query: Query<
-        (
-            Entity,
-            &ActionState<Action>,
-            &mut ExternalImpulse,
-            &mut Velocity,
-        ),
-        With<Player>,
-    >,
+    mut query: Query<(
+        Entity,
+        &Player,
+        &ActionState<Action>,
+        &mut ExternalImpulse,
+        &mut Velocity,
+    )>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (player, action_state, mut impulse, mut velocity) in query.iter_mut() {
+    for (player_entity, player, action_state, mut impulse, mut velocity) in query.iter_mut() {
         if action_state.pressed(&Action::Move) {
             let joystick_value = action_state.clamped_value(&Action::Move);
             if joystick_value > 0.0 {
-                commands.entity(player).insert(Direction::Right);
+                commands.entity(player_entity).insert(Direction::Right);
             } else if joystick_value < 0.0 {
-                commands.entity(player).insert(Direction::Left);
+                commands.entity(player_entity).insert(Direction::Left);
             }
-            if is_in_air(&velocity) {
-                impulse.impulse.x +=
-                    joystick_value * PLAYER_MOVEMENT_IMPULSE_AIR * time.delta_seconds();
-            } else {
+            if player.is_on_ground {
                 impulse.impulse.x +=
                     joystick_value * PLAYER_MOVEMENT_IMPULSE_GROUND * time.delta_seconds();
+            } else {
+                impulse.impulse.x +=
+                    joystick_value * PLAYER_MOVEMENT_IMPULSE_AIR * time.delta_seconds();
             }
         } else {
             // stop the player from moving if joystick is not being pressed and moving slowly
@@ -249,12 +267,12 @@ fn movement(
     }
 }
 
-fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity), With<Player>>, time: Res<Time>) {
-    for (mut impulse, velocity) in query.iter_mut() {
-        if is_in_air(velocity) {
-            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_AIR * time.delta_seconds();
-        } else {
+fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity, &Player)>, time: Res<Time>) {
+    for (mut impulse, velocity, player) in query.iter_mut() {
+        if player.is_on_ground {
             impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_GROUND * time.delta_seconds();
+        } else {
+            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_AIR * time.delta_seconds();
         }
     }
 }
@@ -275,16 +293,24 @@ fn disconnect(
     }
 }
 
-fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &mut Velocity)>) {
+fn fly(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &mut Velocity), With<Wings>>) {
     for (action_state, mut impulse, mut velocity) in query.iter_mut() {
         if action_state.just_pressed(&Action::Jump) {
-            impulse.impulse.y += PLAYER_JUMP_IMPULSE;
+            impulse.impulse.y += PLAYER_FLY_IMPULSE;
         }
 
         velocity.linvel.y = velocity
             .linvel
             .y
             .clamp(-PLAYER_MAX_VELOCITY_Y, PLAYER_MAX_VELOCITY_Y);
+    }
+}
+
+fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), Without<Wings>>) {
+    for (action_state, mut impulse, player) in query.iter_mut() {
+        if action_state.just_pressed(&Action::Jump) && player.is_on_ground {
+            impulse.impulse.y += PLAYER_JUMP_IMPULSE;
+        }
     }
 }
 
@@ -296,18 +322,14 @@ fn is_running(velocity: &Velocity) -> bool {
     !is_close_to_zero(velocity.linvel.x)
 }
 
-fn is_in_air(velocity: &Velocity) -> bool {
-    !is_close_to_zero(velocity.linvel.y)
-}
-
 fn apply_movement_animation(
     mut commands: Commands,
-    query: Query<(Entity, &Velocity), Without<Animation>>,
+    query: Query<(Entity, &Velocity, &Player), Without<Animation>>,
 ) {
-    for (player, velocity) in query.iter() {
-        if is_running(velocity) && !is_in_air(velocity) {
+    for (player_entity, velocity, player) in query.iter() {
+        if is_running(velocity) && player.is_on_ground {
             commands
-                .entity(player)
+                .entity(player_entity)
                 .insert(Animation::new(SPRITE_IDX_WALKING, CYCLE_DELAY));
         }
     }
@@ -315,11 +337,11 @@ fn apply_movement_animation(
 
 fn apply_idle_sprite(
     mut commands: Commands,
-    mut query: Query<(Entity, &Velocity, &mut TextureAtlas)>,
+    mut query: Query<(Entity, &Velocity, &mut TextureAtlas, &Player)>,
 ) {
-    for (player, velocity, mut sprite) in query.iter_mut() {
-        if !is_running(velocity) && !is_in_air(velocity) {
-            commands.entity(player).remove::<Animation>();
+    for (player_entity, velocity, mut sprite, player) in query.iter_mut() {
+        if !is_running(velocity) && player.is_on_ground {
+            commands.entity(player_entity).remove::<Animation>();
             sprite.index = SPRITE_IDX_STAND
         }
     }
@@ -327,11 +349,11 @@ fn apply_idle_sprite(
 
 fn apply_jump_sprite(
     mut commands: Commands,
-    mut query: Query<(Entity, &Velocity, &mut TextureAtlas)>,
+    mut query: Query<(Entity, &Velocity, &mut TextureAtlas, &Player)>,
 ) {
-    for (player, velocity, mut sprite) in query.iter_mut() {
-        if is_in_air(velocity) {
-            commands.entity(player).remove::<Animation>();
+    for (player_entity, velocity, mut sprite, player) in query.iter_mut() {
+        if !player.is_on_ground {
+            commands.entity(player_entity).remove::<Animation>();
             if velocity.linvel.y > 0.0 {
                 sprite.index = SPRITE_IDX_JUMP
             } else {
@@ -389,6 +411,22 @@ fn players_attack(
                         .gamepad,
                 );
             }
+        }
+    }
+}
+
+fn check_if_players_on_ground(
+    mut contact_force_events: EventReader<ContactForceEvent>,
+    mut players: Query<&mut Player>,
+) {
+    for mut player in players.iter_mut() {
+        player.is_on_ground = false;
+    }
+
+    for contact_force_event in contact_force_events.read() {
+        let mut player = players.get_mut(contact_force_event.collider2).unwrap();
+        if contact_force_event.max_force_direction.y > 0.0 {
+            player.is_on_ground = true;
         }
     }
 }
