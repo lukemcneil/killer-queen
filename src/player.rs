@@ -11,10 +11,10 @@ const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
 const PLAYER_JUMP_IMPULSE: f32 = 30.0;
-const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 0.15;
-const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 0.08;
-const PLAYER_FRICTION_GROUND: f32 = 0.0005;
-const PLAYER_FRICTION_AIR: f32 = 0.0001;
+const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 100.0;
+const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 50.0;
+const PLAYER_FRICTION_GROUND: f32 = 0.5;
+const PLAYER_FRICTION_AIR: f32 = 0.1;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 
 const SPRITESHEET_COLS: usize = 7;
@@ -218,6 +218,7 @@ fn movement(
         With<Player>,
     >,
     mut commands: Commands,
+    time: Res<Time>,
 ) {
     for (player, action_state, mut impulse, mut velocity) in query.iter_mut() {
         if action_state.pressed(&Action::Move) {
@@ -228,9 +229,11 @@ fn movement(
                 commands.entity(player).insert(Direction::Left);
             }
             if is_in_air(&velocity) {
-                impulse.impulse.x += joystick_value * PLAYER_MOVEMENT_IMPULSE_AIR;
+                impulse.impulse.x +=
+                    joystick_value * PLAYER_MOVEMENT_IMPULSE_AIR * time.delta_seconds();
             } else {
-                impulse.impulse.x += joystick_value * PLAYER_MOVEMENT_IMPULSE_GROUND;
+                impulse.impulse.x +=
+                    joystick_value * PLAYER_MOVEMENT_IMPULSE_GROUND * time.delta_seconds();
             }
         } else {
             // stop the player from moving if joystick is not being pressed and moving slowly
@@ -246,12 +249,12 @@ fn movement(
     }
 }
 
-fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity), With<Player>>) {
+fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity), With<Player>>, time: Res<Time>) {
     for (mut impulse, velocity) in query.iter_mut() {
         if is_in_air(velocity) {
-            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_AIR;
+            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_AIR * time.delta_seconds();
         } else {
-            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_GROUND;
+            impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_GROUND * time.delta_seconds();
         }
     }
 }
@@ -349,7 +352,7 @@ fn update_sprite_direction(
         }
         for child in children {
             let mut transform = back_colliders
-                .get_mut(child.clone())
+                .get_mut(*child)
                 .expect("player should have collider");
             transform.translation.x = match direction {
                 Direction::Right => -SPRITE_TILE_WIDTH / 4.0,
@@ -368,16 +371,16 @@ fn players_attack(
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
-            let back_collider = if players.get(entity1.clone()).is_ok() {
+            let back_collider = if players.get(*entity1).is_ok() {
                 entity2
-            } else if players.get(entity2.clone()).is_ok() {
+            } else if players.get(*entity2).is_ok() {
                 entity1
             } else {
                 // neither is a player, collision between sensors
                 continue;
             };
 
-            if let Ok(killed_player) = collider_parents.get(back_collider.clone()) {
+            if let Ok(killed_player) = collider_parents.get(*back_collider) {
                 commands.entity(killed_player.get()).despawn_recursive();
                 joined_players.0.remove(
                     &players
