@@ -389,27 +389,31 @@ fn players_attack(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
     collider_parents: Query<&Parent, With<PlayerBackCollider>>,
-    players: Query<&Player>,
+    players: Query<(&Player, Option<&Wings>)>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
-            let back_collider = if players.get(*entity1).is_ok() {
-                entity2
+            let (back_collider, killer) = if players.get(*entity1).is_ok() {
+                (entity2, entity1)
             } else if players.get(*entity2).is_ok() {
-                entity1
+                (entity1, entity2)
             } else {
                 // neither is a player, collision between sensors
                 continue;
             };
 
             if let Ok(killed_player) = collider_parents.get(*back_collider) {
-                commands.entity(killed_player.get()).despawn_recursive();
-                joined_players.0.remove(
-                    &players
-                        .get(killed_player.get())
-                        .expect("killed should have player component")
-                        .gamepad,
-                );
+                let killer_has_wings = players.get(*killer).unwrap().1.is_some();
+                if killer_has_wings {
+                    commands.entity(killed_player.get()).despawn_recursive();
+                    joined_players.0.remove(
+                        &players
+                            .get(killed_player.get())
+                            .expect("killed should have player component")
+                            .0
+                            .gamepad,
+                    );
+                }
             }
         }
     }
@@ -424,9 +428,16 @@ fn check_if_players_on_ground(
     }
 
     for contact_force_event in contact_force_events.read() {
-        let mut player = players.get_mut(contact_force_event.collider2).unwrap();
-        if contact_force_event.max_force_direction.y > 0.0 {
-            player.is_on_ground = true;
+        if let Ok(mut player) = players.get_mut(contact_force_event.collider1) {
+            if contact_force_event.max_force_direction.y != 0.0 {
+                player.is_on_ground = true;
+            }
+        }
+
+        if let Ok(mut player) = players.get_mut(contact_force_event.collider2) {
+            if contact_force_event.max_force_direction.y != 0.0 {
+                player.is_on_ground = true;
+            }
         }
     }
 }
