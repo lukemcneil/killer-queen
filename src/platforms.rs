@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::WINDOW_BOTTOM_Y;
+use crate::{WINDOW_HEIGHT, WINDOW_WIDTH};
 
 const COLOR_PLATFORM: Color = Color::rgb(0.29, 0.31, 0.41);
 
@@ -13,7 +13,7 @@ struct PlatformBundle {
 }
 
 impl PlatformBundle {
-    fn new(x: f32, scale: Vec3) -> Self {
+    fn new(x: f32, y: f32, scale: Vec3) -> Self {
         Self {
             sprite_bundle: SpriteBundle {
                 sprite: Sprite {
@@ -21,7 +21,7 @@ impl PlatformBundle {
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(x, WINDOW_BOTTOM_Y + (scale.y / 2.0), 0.0),
+                    translation: Vec3::new(x, y, 0.0),
                     scale,
                     ..Default::default()
                 },
@@ -42,7 +42,25 @@ impl Plugin for PlatformsPlugin {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn(PlatformBundle::new(-100.0, Vec3::new(75.0, 200.0, 1.0)));
-    commands.spawn(PlatformBundle::new(100.0, Vec3::new(50.0, 350.0, 1.0)));
-    commands.spawn(PlatformBundle::new(350.0, Vec3::new(150.0, 250.0, 1.0)));
+    commands.spawn(PlatformBundle::new(
+        -100.0,
+        0.0,
+        Vec3::new(WINDOW_WIDTH / 2.0, 20.0, 1.0),
+    ));
+    commands.spawn(PlatformBundle::new(
+        300.0,
+        -WINDOW_HEIGHT / 4.0,
+        Vec3::new(WINDOW_WIDTH / 3.0, 20.0, 1.0),
+    ));
+    commands.spawn(PlatformBundle::new(
+        -300.0,
+        -WINDOW_HEIGHT / 4.0,
+        Vec3::new(WINDOW_WIDTH / 3.0, 100.0, 1.0),
+    ));
+    // commands.spawn(PlatformBundle::new(100.0, 0.0, Vec3::new(50.0, 350.0, 1.0)));
+    // commands.spawn(PlatformBundle::new(
+    //     350.0,
+    //     0.0,
+    //     Vec3::new(150.0, 250.0, 1.0),
+    // ));
 }
