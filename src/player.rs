@@ -4,7 +4,11 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
-use crate::{animation::Animation, berries::Berry, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
+use crate::{
+    animation::Animation,
+    berries::{Berry, BerryBundle, BERRY_COLOR},
+    WINDOW_BOTTOM_Y, WINDOW_LEFT_X,
+};
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
@@ -16,7 +20,6 @@ const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 40.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.1;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
-const PLAYER_BERRY_COLOR: Color = Color::BLUE;
 
 const SPRITESHEET_COLS: usize = 7;
 const SPRITESHEET_ROWS: usize = 8;
@@ -276,16 +279,25 @@ fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity, &Player)>, time: 
 
 fn disconnect(
     mut commands: Commands,
-    action_query: Query<(&ActionState<Action>, &Player)>,
+    action_query: Query<(&ActionState<Action>, &Player, Has<Berry>, &Transform)>,
     mut joined_players: ResMut<JoinedPlayers>,
+    asset_server: Res<AssetServer>,
 ) {
-    for (action_state, player) in action_query.iter() {
+    for (action_state, player, killed_has_berry, killed_player_transform) in action_query.iter() {
         if action_state.pressed(&Action::Disconnect) {
             let player_entity = *joined_players.0.get(&player.gamepad).unwrap();
 
             // Despawn thea disconnected player and remove them from the joined player list
             commands.entity(player_entity).despawn_recursive();
             joined_players.0.remove(&player.gamepad);
+
+            if killed_has_berry {
+                commands.spawn(BerryBundle::new(
+                    killed_player_transform.translation.x,
+                    killed_player_transform.translation.y,
+                    &asset_server,
+                ));
+            }
         }
     }
 }
@@ -385,7 +397,8 @@ fn players_attack(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
     collider_parents: Query<&Parent, With<PlayerBackCollider>>,
-    players: Query<(&Player, Option<&Wings>)>,
+    players: Query<(&Player, Has<Wings>, Has<Berry>, &Transform)>,
+    asset_server: Res<AssetServer>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
@@ -398,17 +411,28 @@ fn players_attack(
                 continue;
             };
 
-            if let Ok(killed_player) = collider_parents.get(*back_collider) {
-                let killer_has_wings = players.get(*killer).unwrap().1.is_some();
+            if let Ok(killed_player_entity) = collider_parents.get(*back_collider) {
+                let killer_has_wings = players.get(*killer).unwrap().1;
                 if killer_has_wings {
-                    commands.entity(killed_player.get()).despawn_recursive();
-                    joined_players.0.remove(
-                        &players
-                            .get(killed_player.get())
-                            .expect("killed should have player component")
-                            .0
-                            .gamepad,
-                    );
+                    let (
+                        killed_player,
+                        _killed_has_wings,
+                        killed_has_berry,
+                        killed_player_transform,
+                    ) = players
+                        .get(killed_player_entity.get())
+                        .expect("killed should have player component");
+                    if killed_has_berry {
+                        commands.spawn(BerryBundle::new(
+                            killed_player_transform.translation.x,
+                            killed_player_transform.translation.y,
+                            &asset_server,
+                        ));
+                    }
+                    commands
+                        .entity(killed_player_entity.get())
+                        .despawn_recursive();
+                    joined_players.0.remove(&killed_player.gamepad);
                 }
             }
         }
@@ -442,10 +466,6 @@ fn color_players_with_berry(
     mut players: Query<(Has<Berry>, &mut Sprite), (With<Player>, Without<Wings>)>,
 ) {
     for (has_berry, mut sprite) in players.iter_mut() {
-        sprite.color = if has_berry {
-            PLAYER_BERRY_COLOR
-        } else {
-            Color::WHITE
-        };
+        sprite.color = if has_berry { BERRY_COLOR } else { Color::WHITE };
     }
 }
