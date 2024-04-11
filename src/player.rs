@@ -4,7 +4,7 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
-use crate::{animation::Animation, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
+use crate::{animation::Animation, berries::Berry, WINDOW_BOTTOM_Y, WINDOW_LEFT_X};
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
@@ -16,6 +16,7 @@ const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 40.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.1;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
+const PLAYER_BERRY_COLOR: Color = Color::BLUE;
 
 const SPRITESHEET_COLS: usize = 7;
 const SPRITESHEET_ROWS: usize = 8;
@@ -55,6 +56,7 @@ impl Plugin for PlayerPlugin {
                             apply_idle_sprite.after(movement),
                             apply_jump_sprite,
                             join,
+                            color_players_with_berry,
                         )
                             .after(check_if_players_on_ground),
                     )
@@ -84,14 +86,14 @@ enum Direction {
 }
 
 #[derive(Component)]
-struct Player {
+pub struct Player {
     // This gamepad is used to index each player
     gamepad: Gamepad,
     is_on_ground: bool,
 }
 
 #[derive(Component)]
-struct Wings;
+pub struct Wings;
 
 #[derive(Component)]
 struct PlayerBackCollider;
@@ -192,7 +194,7 @@ fn join(
                         coefficient: 0.0,
                         combine_rule: CoefficientCombineRule::Min,
                     },
-                    ActiveEvents::CONTACT_FORCE_EVENTS,
+                    ActiveEvents::all(),
                     Ccd::enabled(),
                 ));
                 if join_as_queen {
@@ -368,13 +370,12 @@ fn update_sprite_direction(
             Direction::Left => sprite.flip_x = true,
         }
         for child in children {
-            let mut transform = back_colliders
-                .get_mut(*child)
-                .expect("player should have collider");
-            transform.translation.x = match direction {
-                Direction::Right => -SPRITE_TILE_WIDTH / 4.0,
-                Direction::Left => SPRITE_TILE_WIDTH / 4.0,
-            };
+            if let Ok(mut transform) = back_colliders.get_mut(*child) {
+                transform.translation.x = match direction {
+                    Direction::Right => -SPRITE_TILE_WIDTH / 4.0,
+                    Direction::Left => SPRITE_TILE_WIDTH / 4.0,
+                };
+            }
         }
     }
 }
@@ -434,5 +435,17 @@ fn check_if_players_on_ground(
                 player.is_on_ground = true;
             }
         }
+    }
+}
+
+fn color_players_with_berry(
+    mut players: Query<(Has<Berry>, &mut Sprite), (With<Player>, Without<Wings>)>,
+) {
+    for (has_berry, mut sprite) in players.iter_mut() {
+        sprite.color = if has_berry {
+            PLAYER_BERRY_COLOR
+        } else {
+            Color::WHITE
+        };
     }
 }

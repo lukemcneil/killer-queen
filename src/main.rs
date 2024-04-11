@@ -1,8 +1,10 @@
 mod animation;
+mod berries;
 mod platforms;
 mod player;
 
 use animation::AnimationPlugin;
+use berries::BerriesPlugin;
 use bevy::{prelude::*, window::WindowResolution};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
@@ -38,6 +40,7 @@ fn main() {
             PlatformsPlugin,
             PlayerPlugin,
             AnimationPlugin,
+            BerriesPlugin,
         ))
         .add_plugins(WorldInspectorPlugin::new())
         .add_systems(Startup, setup)
