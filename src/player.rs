@@ -13,13 +13,14 @@ use crate::{
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
-const PLAYER_FLY_IMPULSE: f32 = 30.0;
+const PLAYER_FLY_IMPULSE: f32 = 67.5;
 const PLAYER_JUMP_IMPULSE: f32 = 60.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 140.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 40.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.1;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
+const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.5;
 
 const SPRITESHEET_COLS: usize = 7;
 const SPRITESHEET_ROWS: usize = 8;
@@ -28,8 +29,10 @@ const SPRITE_TILE_WIDTH: f32 = 128.0;
 const SPRITE_TILE_HEIGHT: f32 = 256.0;
 const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
 
-const SPRITE_RENDER_WIDTH: f32 = 32.0;
-const SPRITE_RENDER_HEIGHT: f32 = 64.0;
+const WORKER_RENDER_WIDTH: f32 = 32.0;
+const WORKER_RENDER_HEIGHT: f32 = 40.0;
+const QUEEN_RENDER_WIDTH: f32 = 48.0;
+const QUEEN_RENDER_HEIGHT: f32 = 60.0;
 
 const SPRITE_IDX_STAND: usize = 28;
 const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
@@ -139,6 +142,11 @@ fn join(
                 GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
                 GamepadButton::new(gamepad, GamepadButtonType::RightTrigger2),
             ]);
+            let (player_width, player_height) = if join_as_queen {
+                (QUEEN_RENDER_WIDTH, QUEEN_RENDER_HEIGHT)
+            } else {
+                (WORKER_RENDER_WIDTH, WORKER_RENDER_HEIGHT)
+            };
             let team = if button_inputs.any_just_pressed([
                 GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger),
                 GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
@@ -168,8 +176,6 @@ fn join(
                 input_map.insert(Action::Disconnect, GamepadButtonType::Select);
                 input_map.set_gamepad(gamepad);
 
-                let x_scale = SPRITE_RENDER_WIDTH / SPRITE_TILE_WIDTH;
-                let y_scale = SPRITE_RENDER_HEIGHT / SPRITE_TILE_HEIGHT;
                 let mut player = commands.spawn((
                     SpriteSheetBundle {
                         texture,
@@ -186,7 +192,6 @@ fn join(
                                 WINDOW_BOTTOM_Y + 300.0,
                                 0.0,
                             ),
-                            scale: Vec3::new(x_scale, y_scale, 1.0),
                             ..Default::default()
                         },
                         sprite: Sprite {
@@ -199,6 +204,10 @@ fn join(
                                     x: SPRITE_TILE_WIDTH,
                                     y: SPRITE_TILE_HEIGHT,
                                 },
+                            }),
+                            custom_size: Some(Vec2 {
+                                x: player_width,
+                                y: player_height,
                             }),
                             ..Default::default()
                         },
@@ -219,7 +228,10 @@ fn join(
                     (
                         RigidBody::Dynamic,
                         GravityScale(PLAYER_GRAVITY_SCALE),
-                        Collider::cuboid(SPRITE_TILE_WIDTH / 4.0, SPRITE_TILE_ACTUAL_HEIGHT / 2.0),
+                        Collider::cuboid(
+                            player_width / 2.0 * PLAYER_COLLIDER_WIDTH_MULTIPLIER,
+                            player_height / 2.0,
+                        ),
                         Velocity::default(),
                         ExternalImpulse::default(),
                         LockedAxes::ROTATION_LOCKED,
@@ -241,13 +253,11 @@ fn join(
                         children.spawn((
                             SpriteBundle {
                                 sprite: Sprite {
-                                    custom_size: Some(Vec2::splat(
-                                        SPRITE_RENDER_WIDTH / x_scale * 1.5,
-                                    )),
+                                    custom_size: Some(Vec2::splat(player_width * 1.5)),
                                     ..Default::default()
                                 },
                                 transform: Transform::from_translation(
-                                    Vec3::Y * SPRITE_RENDER_HEIGHT,
+                                    Vec3::Y * player_height / 2.0,
                                 ),
                                 texture: crown_texture,
                                 ..Default::default()
@@ -444,6 +454,7 @@ fn players_attack(
             Has<Wings>,
             Has<Berry>,
             &Direction,
+            &Sprite,
         ),
         With<Player>,
     >,
@@ -458,41 +469,51 @@ fn players_attack(
             {
                 let player1_translation = player1_components.1.translation;
                 let player2_translation = player2_components.1.translation;
+                let player1_half_width = player1_components.7.custom_size.unwrap().x / 2.0
+                    * PLAYER_COLLIDER_WIDTH_MULTIPLIER;
+                let player2_half_width = player2_components.7.custom_size.unwrap().x / 2.0
+                    * PLAYER_COLLIDER_WIDTH_MULTIPLIER;
+                let player1_half_height = player1_components.7.custom_size.unwrap().y / 2.0;
+                let player2_half_height = player2_components.7.custom_size.unwrap().y / 2.0;
+
                 let x_diff = (player1_translation.x - player2_translation.x).abs();
                 let y_diff = (player1_translation.y - player2_translation.y).abs();
-                let one_player_on_top = (y_diff
-                    - (SPRITE_RENDER_HEIGHT * (SPRITE_TILE_ACTUAL_HEIGHT / SPRITE_TILE_HEIGHT)))
-                    > (x_diff - (SPRITE_RENDER_WIDTH / 2.0));
-                let (killed_player_components, killer_player_components) = if one_player_on_top {
-                    // one player on top
-                    if player1_translation.y > player2_translation.y {
-                        (player2_components, player1_components)
-                    } else {
-                        (player1_components, player2_components)
-                    }
-                } else {
-                    // hit each other horizontally
+
+                let one_player_on_top = (y_diff - (player1_half_height + player2_half_height))
+                    > (x_diff - (player1_half_width + player2_half_width));
+
+                let (killed_player_components, killer_player_components) = {
                     let player1_has_wings = player1_components.4;
                     let player2_has_wings = player2_components.4;
                     match (player1_has_wings, player2_has_wings) {
                         (true, true) => {
                             // both are queens
-                            let (left_player_components, right_player_components) =
-                                if player1_translation.x < player2_translation.x {
-                                    (player1_components, player2_components)
-                                } else {
+                            if one_player_on_top {
+                                // one player on top
+                                if player1_translation.y > player2_translation.y {
                                     (player2_components, player1_components)
-                                };
-                            let left_player_direction = left_player_components.6;
-                            let right_player_direction = right_player_components.6;
-                            match (left_player_direction, right_player_direction) {
-                                (Direction::Right, Direction::Right) => {
-                                    (right_player_components, left_player_components)
+                                } else {
+                                    (player1_components, player2_components)
                                 }
-                                (Direction::Left, Direction::Left) => {
-                                    (left_player_components, right_player_components)
+                            } else {
+                                // hit each other horizontally
+                                let (left_player_components, right_player_components) =
+                                    if player1_translation.x < player2_translation.x {
+                                        (player1_components, player2_components)
+                                    } else {
+                                        (player2_components, player1_components)
+                                    };
+                                let left_player_direction = left_player_components.6;
+                                let right_player_direction = right_player_components.6;
+                                match (left_player_direction, right_player_direction) {
+                                    (Direction::Right, Direction::Right) => {
+                                        (right_player_components, left_player_components)
+                                    }
+                                    (Direction::Left, Direction::Left) => {
+                                        (left_player_components, right_player_components)
+                                    }
+                                    _ => continue,
                                 }
-                                _ => continue,
                             }
                         }
                         (true, false) => (player2_components, player1_components),
@@ -508,9 +529,10 @@ fn players_attack(
                     _,
                     killed_has_berry,
                     _,
+                    _,
                 ) = killed_player_components;
-                let (_, _, _, killer_team, killer_has_wings, _, _) = killer_player_components;
-                if killed_team == killer_team || !killer_has_wings {
+                let (_, _, _, killer_team, _, _, _, _) = killer_player_components;
+                if killed_team == killer_team {
                     continue;
                 }
                 if killed_has_berry {
