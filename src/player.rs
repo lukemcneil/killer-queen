@@ -118,9 +118,6 @@ pub struct Player {
 #[derive(Component)]
 pub struct Wings;
 
-#[derive(Component)]
-struct PlayerBackCollider;
-
 fn join(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
@@ -214,41 +211,32 @@ fn join(
                     },
                     Name::new("Player"),
                     InputManagerBundle::with_map(input_map),
-                    RigidBody::Dynamic,
-                    GravityScale(PLAYER_GRAVITY_SCALE),
-                    Collider::cuboid(SPRITE_TILE_WIDTH / 4.0, SPRITE_TILE_ACTUAL_HEIGHT / 2.0),
-                    Velocity::default(),
-                    ExternalImpulse::default(),
                     match team {
                         Team::Red => Direction::Right,
                         Team::Blue => Direction::Left,
                     },
-                    LockedAxes::ROTATION_LOCKED,
-                    Friction {
-                        coefficient: 0.0,
-                        combine_rule: CoefficientCombineRule::Min,
-                    },
-                    ActiveEvents::all(),
-                    Ccd::enabled(),
                     team,
+                    (
+                        RigidBody::Dynamic,
+                        GravityScale(PLAYER_GRAVITY_SCALE),
+                        Collider::cuboid(SPRITE_TILE_WIDTH / 4.0, SPRITE_TILE_ACTUAL_HEIGHT / 2.0),
+                        Velocity::default(),
+                        ExternalImpulse::default(),
+                        LockedAxes::ROTATION_LOCKED,
+                        Friction {
+                            coefficient: 0.0,
+                            combine_rule: CoefficientCombineRule::Min,
+                        },
+                        ActiveEvents::all(),
+                        Ccd::enabled(),
+                    ),
                 ));
                 if join_as_queen {
                     player.insert(Wings);
                 }
 
-                player.with_children(|children| {
-                    children
-                        .spawn(Collider::ball(SPRITE_RENDER_WIDTH / 2.0))
-                        .insert(TransformBundle::from_transform(Transform::from_xyz(
-                            0.0,
-                            SPRITE_TILE_ACTUAL_HEIGHT / 2.0,
-                            0.0,
-                        )))
-                        .insert(Sensor)
-                        .insert(ActiveEvents::COLLISION_EVENTS)
-                        .insert(PlayerBackCollider);
-
-                    if join_as_queen {
+                if join_as_queen {
+                    player.with_children(|children| {
                         let crown_texture: Handle<Image> = server.load("crown.png");
                         children.spawn((
                             SpriteBundle {
@@ -266,8 +254,8 @@ fn join(
                             },
                             Crown,
                         ));
-                    }
-                });
+                    });
+                }
 
                 // Insert the created player and its gamepad to the hashmap of joined players
                 // Since uniqueness was already checked above, we can insert here unchecked
@@ -426,25 +414,20 @@ fn apply_jump_sprite(
 }
 
 fn update_sprite_direction(
-    mut query: Query<(&mut Sprite, &Direction, &Children), With<Player>>,
-    mut back_colliders: Query<&mut Transform, With<PlayerBackCollider>>,
+    mut query: Query<(&mut Sprite, &Direction, Option<&Children>), With<Player>>,
     mut crowns: Query<&mut Sprite, (With<Crown>, Without<Player>)>,
 ) {
-    for (mut sprite, direction, children) in query.iter_mut() {
+    for (mut sprite, direction, maybe_children) in query.iter_mut() {
         let should_flip_x = match direction {
             Direction::Right => false,
             Direction::Left => true,
         };
         sprite.flip_x = should_flip_x;
-        for child in children {
-            if let Ok(mut transform) = back_colliders.get_mut(*child) {
-                transform.translation.x = match direction {
-                    Direction::Right => -SPRITE_TILE_WIDTH / 4.0,
-                    Direction::Left => SPRITE_TILE_WIDTH / 4.0,
-                };
-            }
-            if let Ok(mut crown_sprite) = crowns.get_mut(*child) {
-                crown_sprite.flip_x = should_flip_x;
+        if let Some(children) = maybe_children {
+            for child in children {
+                if let Ok(mut crown_sprite) = crowns.get_mut(*child) {
+                    crown_sprite.flip_x = should_flip_x;
+                }
             }
         }
     }
@@ -452,51 +435,94 @@ fn update_sprite_direction(
 
 fn players_attack(
     mut collision_events: EventReader<CollisionEvent>,
+    players: Query<
+        (
+            Entity,
+            &Transform,
+            &Player,
+            &Team,
+            Has<Wings>,
+            Has<Berry>,
+            &Direction,
+        ),
+        With<Player>,
+    >,
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
-    collider_parents: Query<&Parent, With<PlayerBackCollider>>,
-    players: Query<(&Player, Has<Wings>, Has<Berry>, &Transform, &Team)>,
     asset_server: Res<AssetServer>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
-            let (back_collider, killer) = if players.get(*entity1).is_ok() {
-                (entity2, entity1)
-            } else if players.get(*entity2).is_ok() {
-                (entity1, entity2)
-            } else {
-                // neither is a player, collision between sensors
-                continue;
-            };
-
-            if let Ok(killed_player_entity) = collider_parents.get(*back_collider) {
-                let (_, killer_has_wings, _, _, killer_team) = players.get(*killer).unwrap();
-                if killer_has_wings {
-                    let (
-                        killed_player,
-                        _killed_has_wings,
-                        killed_has_berry,
-                        killed_player_transform,
-                        killed_player_team,
-                    ) = players
-                        .get(killed_player_entity.get())
-                        .expect("killed should have player component");
-                    if killer_team == killed_player_team {
-                        continue;
+            if let (Ok(player1_components), Ok(player2_components)) =
+                (players.get(*entity1), players.get(*entity2))
+            {
+                let player1_translation = player1_components.1.translation;
+                let player2_translation = player2_components.1.translation;
+                let x_diff = (player1_translation.x - player2_translation.x).abs();
+                let y_diff = (player1_translation.y - player2_translation.y).abs();
+                let one_player_on_top = (y_diff
+                    - (SPRITE_RENDER_HEIGHT * (SPRITE_TILE_ACTUAL_HEIGHT / SPRITE_TILE_HEIGHT)))
+                    > (x_diff - (SPRITE_RENDER_WIDTH / 2.0));
+                let (killed_player_components, killer_player_components) = if one_player_on_top {
+                    // one player on top
+                    if player1_translation.y > player2_translation.y {
+                        (player2_components, player1_components)
+                    } else {
+                        (player1_components, player2_components)
                     }
-                    if killed_has_berry {
-                        commands.spawn(BerryBundle::new(
-                            killed_player_transform.translation.x,
-                            killed_player_transform.translation.y,
-                            RigidBody::Dynamic,
-                            &asset_server,
-                        ));
+                } else {
+                    // hit each other horizontally
+                    let player1_has_wings = player1_components.4;
+                    let player2_has_wings = player2_components.4;
+                    match (player1_has_wings, player2_has_wings) {
+                        (true, true) => {
+                            // both are queens
+                            let (left_player_components, right_player_components) =
+                                if player1_translation.x < player2_translation.x {
+                                    (player1_components, player2_components)
+                                } else {
+                                    (player2_components, player1_components)
+                                };
+                            let left_player_direction = left_player_components.6;
+                            let right_player_direction = right_player_components.6;
+                            match (left_player_direction, right_player_direction) {
+                                (Direction::Right, Direction::Right) => {
+                                    (right_player_components, left_player_components)
+                                }
+                                (Direction::Left, Direction::Left) => {
+                                    (left_player_components, right_player_components)
+                                }
+                                _ => continue,
+                            }
+                        }
+                        (true, false) => (player2_components, player1_components),
+                        (false, true) => (player1_components, player2_components),
+                        (false, false) => continue,
                     }
-                    commands
-                        .entity(killed_player_entity.get())
-                        .despawn_recursive();
-                    joined_players.0.remove(&killed_player.gamepad);
+                };
+                let (
+                    killed_entity,
+                    killed_player_transform,
+                    killed_player,
+                    killed_team,
+                    _,
+                    killed_has_berry,
+                    _,
+                ) = killed_player_components;
+                let (_, _, _, killer_team, killer_has_wings, _, _) = killer_player_components;
+                if killed_team == killer_team || !killer_has_wings {
+                    continue;
                 }
+                if killed_has_berry {
+                    commands.spawn(BerryBundle::new(
+                        killed_player_transform.translation.x,
+                        killed_player_transform.translation.y,
+                        RigidBody::Dynamic,
+                        &asset_server,
+                    ));
+                }
+                commands.entity(killed_entity).despawn_recursive();
+                joined_players.0.remove(&killed_player.gamepad);
             }
         }
     }
