@@ -21,7 +21,7 @@ pub const WINDOW_LEFT_X: f32 = WINDOW_WIDTH / -2.0;
 
 const FLOOR_THICKNESS: f32 = 10.0;
 
-const COLOR_BACKGROUND: Color = Color::rgb(0.13, 0.13, 0.23);
+const COLOR_BACKGROUND: Color = Color::rgb(0.5, 0.5, 0.5);
 const COLOR_FLOOR: Color = Color::rgb(0.45, 0.55, 0.66);
 
 fn main() {

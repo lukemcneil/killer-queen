@@ -2,12 +2,11 @@ use bevy::{prelude::*, utils::HashSet};
 use bevy_rapier2d::prelude::*;
 
 use crate::{
-    player::{Player, Wings},
+    player::{Player, Team, Wings},
     WINDOW_HEIGHT, WINDOW_WIDTH,
 };
 
 const BERRY_RENDER_RADIUS: f32 = 10.0;
-pub const BERRY_COLOR: Color = Color::BLUE;
 
 pub struct BerriesPlugin;
 
@@ -65,10 +64,11 @@ struct BerryCellBundle {
     sprite_bundle: SpriteBundle,
     collider: Collider,
     sensor: Sensor,
+    team: Team,
 }
 
 impl BerryCellBundle {
-    fn new(x: f32, y: f32, asset_server: &Res<AssetServer>) -> Self {
+    fn new(x: f32, y: f32, team: Team, asset_server: &Res<AssetServer>) -> Self {
         let texture = asset_server.load("berry-cell.png");
         Self {
             berry_cell: BerryCell,
@@ -86,6 +86,7 @@ impl BerryCellBundle {
             },
             collider: Collider::ball(BERRY_RENDER_RADIUS),
             sensor: Sensor,
+            team,
         }
     }
 }
@@ -93,10 +94,16 @@ impl BerryCellBundle {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let num_berries = 10;
     for i in 0..num_berries {
+        let team = if i % 2 == 0 { Team::Red } else { Team::Blue };
         let x =
             (-WINDOW_WIDTH / 2.0) + (WINDOW_WIDTH / (num_berries as f32 + 1.0)) * (i + 1) as f32;
         commands.spawn((BerryBundle::new(x, 50.0, &asset_server),));
-        commands.spawn(BerryCellBundle::new(x, WINDOW_HEIGHT / 4.0, &asset_server));
+        commands.spawn(BerryCellBundle::new(
+            x,
+            WINDOW_HEIGHT / 4.0,
+            team,
+            &asset_server,
+        ));
     }
 }
 
@@ -127,22 +134,24 @@ fn grab_berries(
 
 fn put_berries_in_cells(
     mut collision_events: EventReader<CollisionEvent>,
-    empty_berry_cells: Query<Entity, (With<BerryCell>, Without<Berry>)>,
-    players_with_berries: Query<Entity, (With<Player>, With<Berry>, Without<Wings>)>,
+    empty_berry_cells: Query<(Entity, &Team), (With<BerryCell>, Without<Berry>)>,
+    players_with_berries: Query<(Entity, &Team), (With<Player>, With<Berry>, Without<Wings>)>,
     mut commands: Commands,
 ) {
     let mut placed_berries_this_frame = HashSet::new();
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
             for (berry_cell_entity, player_entity) in [(entity1, entity2), (entity2, entity1)] {
-                if let Ok(berry_cell) = empty_berry_cells.get(*berry_cell_entity) {
-                    if let Ok(player) = players_with_berries.get(*player_entity) {
+                if let Ok((berry_cell, berry_team)) = empty_berry_cells.get(*berry_cell_entity) {
+                    if let Ok((player, player_team)) = players_with_berries.get(*player_entity) {
                         if placed_berries_this_frame.contains(&player) {
                             continue;
                         }
-                        commands.entity(player).remove::<Berry>();
-                        commands.entity(berry_cell).insert(Berry);
-                        placed_berries_this_frame.insert(player);
+                        if berry_team == player_team {
+                            commands.entity(player).remove::<Berry>();
+                            commands.entity(berry_cell).insert(Berry);
+                            placed_berries_this_frame.insert(player);
+                        }
                     }
                 }
             }
@@ -150,8 +159,10 @@ fn put_berries_in_cells(
     }
 }
 
-fn color_cells_with_berry(mut berry_cells: Query<(Has<Berry>, &mut Sprite), With<BerryCell>>) {
-    for (has_berry, mut sprite) in berry_cells.iter_mut() {
-        sprite.color = if has_berry { BERRY_COLOR } else { Color::WHITE };
+fn color_cells_with_berry(
+    mut berry_cells: Query<(Has<Berry>, &mut Sprite, &Team), With<BerryCell>>,
+) {
+    for (has_berry, mut sprite, team) in berry_cells.iter_mut() {
+        sprite.color = team.color(has_berry);
     }
 }

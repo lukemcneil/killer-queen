@@ -6,7 +6,7 @@ use leafwing_input_manager::prelude::*;
 
 use crate::{
     animation::Animation,
-    berries::{Berry, BerryBundle, BERRY_COLOR},
+    berries::{Berry, BerryBundle},
     WINDOW_BOTTOM_Y, WINDOW_LEFT_X,
 };
 
@@ -88,6 +88,23 @@ enum Direction {
     Left,
 }
 
+#[derive(Component, PartialEq, Eq)]
+pub enum Team {
+    Red,
+    Blue,
+}
+
+impl Team {
+    pub fn color(&self, has_berry: bool) -> Color {
+        match (self, has_berry) {
+            (Team::Red, true) => Color::rgb_u8(171, 35, 40),
+            (Team::Red, false) => Color::rgb_u8(235, 33, 46),
+            (Team::Blue, true) => Color::rgb_u8(0, 68, 129),
+            (Team::Blue, false) => Color::rgb_u8(46, 103, 248),
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct Player {
     // This gamepad is used to index each player
@@ -112,12 +129,24 @@ fn join(
     for gamepad in gamepads.iter() {
         // Join the game when both bumpers (L+R) on the controller are pressed
         // We drop down the Bevy's input to get the input from each gamepad
-        if button_inputs.just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
-            || button_inputs
-                .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::RightTrigger))
-        {
-            let join_as_queen = button_inputs
-                .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger));
+        if button_inputs.any_just_pressed([
+            GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger),
+            GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
+            GamepadButton::new(gamepad, GamepadButtonType::RightTrigger),
+            GamepadButton::new(gamepad, GamepadButtonType::RightTrigger2),
+        ]) {
+            let join_as_queen = button_inputs.any_just_pressed([
+                GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
+                GamepadButton::new(gamepad, GamepadButtonType::RightTrigger2),
+            ]);
+            let team = if button_inputs.any_just_pressed([
+                GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger),
+                GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
+            ]) {
+                Team::Red
+            } else {
+                Team::Blue
+            };
             // Make sure a player cannot join twice
             if !joined_players.0.contains_key(&gamepad) {
                 let texture: Handle<Image> = server.load("spritesheets/spritesheet_players.png");
@@ -199,6 +228,7 @@ fn join(
                     },
                     ActiveEvents::all(),
                     Ccd::enabled(),
+                    team,
                 ));
                 if join_as_queen {
                     player.insert(Wings);
@@ -463,9 +493,9 @@ fn check_if_players_on_ground(
 }
 
 fn color_players_with_berry(
-    mut players: Query<(Has<Berry>, &mut Sprite), (With<Player>, Without<Wings>)>,
+    mut players: Query<(Has<Berry>, &mut Sprite, &Team), (With<Player>, Without<Wings>)>,
 ) {
-    for (has_berry, mut sprite) in players.iter_mut() {
-        sprite.color = if has_berry { BERRY_COLOR } else { Color::WHITE };
+    for (has_berry, mut sprite, team) in players.iter_mut() {
+        sprite.color = team.color(has_berry);
     }
 }
