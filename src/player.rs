@@ -14,9 +14,9 @@ const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
 const PLAYER_FLY_IMPULSE: f32 = 67.5;
-const PLAYER_JUMP_IMPULSE: f32 = 60.0;
-const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 140.0;
-const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 40.0;
+const PLAYER_JUMP_IMPULSE: f32 = 55.0;
+const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
+const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 50.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.1;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
@@ -256,9 +256,11 @@ fn join(
                                     custom_size: Some(Vec2::splat(player_width * 1.5)),
                                     ..Default::default()
                                 },
-                                transform: Transform::from_translation(
-                                    Vec3::Y * player_height / 2.0,
-                                ),
+                                transform: Transform::from_translation(Vec3 {
+                                    x: 0.0,
+                                    y: player_height / 2.0,
+                                    z: 1.0,
+                                }),
                                 texture: crown_texture,
                                 ..Default::default()
                             },
