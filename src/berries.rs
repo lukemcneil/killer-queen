@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 
 use crate::{
     player::{Player, Team, Wings},
-    WINDOW_HEIGHT, WINDOW_WIDTH,
+    WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X, WINDOW_WIDTH,
 };
 
 const BERRY_RENDER_RADIUS: f32 = 10.0;
@@ -32,7 +32,7 @@ pub struct BerryBundle {
 }
 
 impl BerryBundle {
-    pub fn new(x: f32, y: f32, asset_server: &Res<AssetServer>) -> Self {
+    pub fn new(x: f32, y: f32, body: RigidBody, asset_server: &Res<AssetServer>) -> Self {
         let texture = asset_server.load("berry.png");
         Self {
             berry: Berry,
@@ -48,7 +48,7 @@ impl BerryBundle {
                 },
                 ..Default::default()
             },
-            body: RigidBody::Dynamic,
+            body,
             collider: Collider::ball(BERRY_RENDER_RADIUS),
             restitution: Restitution::coefficient(0.7),
         }
@@ -95,12 +95,22 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let num_berries = 10;
     for i in 0..num_berries {
         let team = if i % 2 == 0 { Team::Red } else { Team::Blue };
-        let x =
-            (-WINDOW_WIDTH / 2.0) + (WINDOW_WIDTH / (num_berries as f32 + 1.0)) * (i + 1) as f32;
-        commands.spawn((BerryBundle::new(x, 50.0, &asset_server),));
-        commands.spawn(BerryCellBundle::new(
+        let berry_spread_width = WINDOW_WIDTH / 2.0;
+        let x = (-berry_spread_width / 2.0)
+            + (berry_spread_width / (num_berries as f32 + 1.0)) * (i + 1) as f32;
+        commands.spawn(BerryBundle::new(
             x,
-            WINDOW_HEIGHT / 4.0,
+            WINDOW_HEIGHT / 5.0,
+            RigidBody::Fixed,
+            &asset_server,
+        ));
+        commands.spawn(BerryCellBundle::new(
+            if i % 2 == 0 {
+                WINDOW_LEFT_X + 100.0
+            } else {
+                WINDOW_RIGHT_X - 100.0
+            },
+            WINDOW_BOTTOM_Y + BERRY_RENDER_RADIUS * 2.0 * (i + 1) as f32,
             team,
             &asset_server,
         ));

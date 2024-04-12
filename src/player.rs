@@ -7,7 +7,7 @@ use leafwing_input_manager::prelude::*;
 use crate::{
     animation::Animation,
     berries::{Berry, BerryBundle},
-    WINDOW_BOTTOM_Y, WINDOW_LEFT_X,
+    WINDOW_BOTTOM_Y, WINDOW_LEFT_X, WINDOW_RIGHT_X,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
@@ -182,7 +182,10 @@ fn join(
                         },
                         transform: Transform {
                             translation: Vec3::new(
-                                WINDOW_LEFT_X + 100.0,
+                                match team {
+                                    Team::Red => WINDOW_LEFT_X + 100.0,
+                                    Team::Blue => WINDOW_RIGHT_X - 100.0,
+                                },
                                 WINDOW_BOTTOM_Y + 300.0,
                                 0.0,
                             ),
@@ -216,7 +219,10 @@ fn join(
                     Collider::cuboid(SPRITE_TILE_WIDTH / 4.0, SPRITE_TILE_ACTUAL_HEIGHT / 2.0),
                     Velocity::default(),
                     ExternalImpulse::default(),
-                    Direction::Right,
+                    match team {
+                        Team::Red => Direction::Right,
+                        Team::Blue => Direction::Left,
+                    },
                     LockedAxes::ROTATION_LOCKED,
                     Friction {
                         coefficient: 0.0,
@@ -341,6 +347,7 @@ fn disconnect(
                 commands.spawn(BerryBundle::new(
                     killed_player_transform.translation.x,
                     killed_player_transform.translation.y,
+                    RigidBody::Dynamic,
                     &asset_server,
                 ));
             }
@@ -481,6 +488,7 @@ fn players_attack(
                         commands.spawn(BerryBundle::new(
                             killed_player_transform.translation.x,
                             killed_player_transform.translation.y,
+                            RigidBody::Dynamic,
                             &asset_server,
                         ));
                     }

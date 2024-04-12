@@ -43,7 +43,7 @@ impl Plugin for PlatformsPlugin {
 
 fn setup(mut commands: Commands) {
     commands.spawn(PlatformBundle::new(
-        -100.0,
+        0.0,
         0.0,
         Vec3::new(WINDOW_WIDTH / 2.0, 20.0, 1.0),
     ));
@@ -55,6 +55,6 @@ fn setup(mut commands: Commands) {
     commands.spawn(PlatformBundle::new(
         -300.0,
         -WINDOW_HEIGHT / 4.0,
-        Vec3::new(WINDOW_WIDTH / 3.0, 100.0, 1.0),
+        Vec3::new(WINDOW_WIDTH / 3.0, 20.0, 1.0),
     ));
 }

@@ -8,7 +8,7 @@ mod player;
 use animation::AnimationPlugin;
 use berries::BerriesPlugin;
 use bevy::{prelude::*, window::WindowResolution};
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
+// use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 use platforms::PlatformsPlugin;
 use player::PlayerPlugin;
@@ -18,6 +18,8 @@ const WINDOW_HEIGHT: f32 = 800.0;
 
 pub const WINDOW_BOTTOM_Y: f32 = WINDOW_HEIGHT / -2.0;
 pub const WINDOW_LEFT_X: f32 = WINDOW_WIDTH / -2.0;
+pub const WINDOW_TOP_Y: f32 = WINDOW_HEIGHT / 2.0;
+pub const WINDOW_RIGHT_X: f32 = WINDOW_WIDTH / 2.0;
 
 const FLOOR_THICKNESS: f32 = 10.0;
 
@@ -44,7 +46,7 @@ fn main() {
             AnimationPlugin,
             BerriesPlugin,
         ))
-        .add_plugins(WorldInspectorPlugin::new())
+        // .add_plugins(WorldInspectorPlugin::new())
         .add_systems(Startup, setup)
         .run();
 }
