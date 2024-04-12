@@ -448,7 +448,7 @@ fn players_attack(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
     collider_parents: Query<&Parent, With<PlayerBackCollider>>,
-    players: Query<(&Player, Has<Wings>, Has<Berry>, &Transform)>,
+    players: Query<(&Player, Has<Wings>, Has<Berry>, &Transform, &Team)>,
     asset_server: Res<AssetServer>,
 ) {
     for collision_event in collision_events.read() {
@@ -463,16 +463,20 @@ fn players_attack(
             };
 
             if let Ok(killed_player_entity) = collider_parents.get(*back_collider) {
-                let killer_has_wings = players.get(*killer).unwrap().1;
+                let (_, killer_has_wings, _, _, killer_team) = players.get(*killer).unwrap();
                 if killer_has_wings {
                     let (
                         killed_player,
                         _killed_has_wings,
                         killed_has_berry,
                         killed_player_transform,
+                        killed_player_team,
                     ) = players
                         .get(killed_player_entity.get())
                         .expect("killed should have player component");
+                    if killer_team == killed_player_team {
+                        continue;
+                    }
                     if killed_has_berry {
                         commands.spawn(BerryBundle::new(
                             killed_player_transform.translation.x,
