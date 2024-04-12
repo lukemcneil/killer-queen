@@ -94,6 +94,9 @@ pub enum Team {
     Blue,
 }
 
+#[derive(Component)]
+pub struct Crown;
+
 impl Team {
     pub fn color(&self, has_berry: bool) -> Color {
         match (self, has_berry) {
@@ -168,6 +171,8 @@ fn join(
                 input_map.insert(Action::Disconnect, GamepadButtonType::Select);
                 input_map.set_gamepad(gamepad);
 
+                let x_scale = SPRITE_RENDER_WIDTH / SPRITE_TILE_WIDTH;
+                let y_scale = SPRITE_RENDER_HEIGHT / SPRITE_TILE_HEIGHT;
                 let mut player = commands.spawn((
                     SpriteSheetBundle {
                         texture,
@@ -181,11 +186,7 @@ fn join(
                                 WINDOW_BOTTOM_Y + 300.0,
                                 0.0,
                             ),
-                            scale: Vec3::new(
-                                SPRITE_RENDER_WIDTH / SPRITE_TILE_WIDTH,
-                                SPRITE_RENDER_HEIGHT / SPRITE_TILE_HEIGHT,
-                                1.0,
-                            ),
+                            scale: Vec3::new(x_scale, y_scale, 1.0),
                             ..Default::default()
                         },
                         sprite: Sprite {
@@ -199,11 +200,6 @@ fn join(
                                     y: SPRITE_TILE_HEIGHT,
                                 },
                             }),
-                            color: if join_as_queen {
-                                Color::GOLD
-                            } else {
-                                Color::WHITE
-                            },
                             ..Default::default()
                         },
 
@@ -245,6 +241,26 @@ fn join(
                         .insert(Sensor)
                         .insert(ActiveEvents::COLLISION_EVENTS)
                         .insert(PlayerBackCollider);
+
+                    if join_as_queen {
+                        let crown_texture: Handle<Image> = server.load("crown.png");
+                        children.spawn((
+                            SpriteBundle {
+                                sprite: Sprite {
+                                    custom_size: Some(Vec2::splat(
+                                        SPRITE_RENDER_WIDTH / x_scale * 1.5,
+                                    )),
+                                    ..Default::default()
+                                },
+                                transform: Transform::from_translation(
+                                    Vec3::Y * SPRITE_RENDER_HEIGHT,
+                                ),
+                                texture: crown_texture,
+                                ..Default::default()
+                            },
+                            Crown,
+                        ));
+                    }
                 });
 
                 // Insert the created player and its gamepad to the hashmap of joined players
@@ -403,20 +419,25 @@ fn apply_jump_sprite(
 }
 
 fn update_sprite_direction(
-    mut query: Query<(&mut Sprite, &Direction, &Children)>,
+    mut query: Query<(&mut Sprite, &Direction, &Children), With<Player>>,
     mut back_colliders: Query<&mut Transform, With<PlayerBackCollider>>,
+    mut crowns: Query<&mut Sprite, (With<Crown>, Without<Player>)>,
 ) {
     for (mut sprite, direction, children) in query.iter_mut() {
-        match direction {
-            Direction::Right => sprite.flip_x = false,
-            Direction::Left => sprite.flip_x = true,
-        }
+        let should_flip_x = match direction {
+            Direction::Right => false,
+            Direction::Left => true,
+        };
+        sprite.flip_x = should_flip_x;
         for child in children {
             if let Ok(mut transform) = back_colliders.get_mut(*child) {
                 transform.translation.x = match direction {
                     Direction::Right => -SPRITE_TILE_WIDTH / 4.0,
                     Direction::Left => SPRITE_TILE_WIDTH / 4.0,
                 };
+            }
+            if let Ok(mut crown_sprite) = crowns.get_mut(*child) {
+                crown_sprite.flip_x = should_flip_x;
             }
         }
     }
@@ -492,9 +513,7 @@ fn check_if_players_on_ground(
     }
 }
 
-fn color_players_with_berry(
-    mut players: Query<(Has<Berry>, &mut Sprite, &Team), (With<Player>, Without<Wings>)>,
-) {
+fn color_players_with_berry(mut players: Query<(Has<Berry>, &mut Sprite, &Team), With<Player>>) {
     for (has_berry, mut sprite, team) in players.iter_mut() {
         sprite.color = team.color(has_berry);
     }
