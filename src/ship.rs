@@ -138,7 +138,7 @@ fn color_ships_with_drivers(
 ) {
     for (maybe_team, mut sprite) in ships_with_drivers.iter_mut() {
         sprite.color = match maybe_team {
-            Some(team) => team.color(false),
+            Some(team) => team.color(),
             None => Color::WHITE,
         };
     }

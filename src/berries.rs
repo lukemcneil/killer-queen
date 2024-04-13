@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 
 use crate::{
     platforms::PLATFORM_HEIGHT,
-    player::{Player, Team, Wings},
+    player::{Player, Team, Wings, WORKER_RENDER_WIDTH},
     WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
@@ -13,10 +13,8 @@ pub struct BerriesPlugin;
 
 impl Plugin for BerriesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            Update,
-            (grab_berries, put_berries_in_cells, color_cells_with_berry),
-        );
+        app.add_systems(Startup, setup)
+            .add_systems(Update, (grab_berries, put_berries_in_cells));
     }
 }
 
@@ -44,7 +42,7 @@ impl BerryBundle {
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(x, y, 0.0),
+                    translation: Vec3::new(x, y, -1.0),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -77,6 +75,7 @@ impl BerryCellBundle {
                 texture,
                 sprite: Sprite {
                     custom_size: Some(Vec2::splat(BERRY_RENDER_RADIUS * 2.0)),
+                    color: team.color(),
                     ..Default::default()
                 },
                 transform: Transform {
@@ -185,6 +184,7 @@ fn grab_berries(
     berries: Query<Entity, (With<Berry>, Without<Player>, Without<BerryCell>)>,
     players_without_berries: Query<Entity, (With<Player>, Without<Berry>, Without<Wings>)>,
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let mut grabbed_berries_this_frame = HashSet::new();
     for collision_event in collision_events.read() {
@@ -196,7 +196,20 @@ fn grab_berries(
                             continue;
                         }
                         commands.entity(berry).despawn();
-                        commands.entity(player).insert(Berry);
+                        commands
+                            .entity(player)
+                            .insert(Berry)
+                            .with_children(|children| {
+                                children
+                                    .spawn(BerryBundle::new(
+                                        -WORKER_RENDER_WIDTH / 4.0,
+                                        0.0,
+                                        RigidBody::Dynamic,
+                                        &asset_server,
+                                    ))
+                                    .remove::<RigidBody>()
+                                    .remove::<Collider>();
+                            });
                         grabbed_berries_this_frame.insert(player);
                     }
                 }
@@ -207,35 +220,38 @@ fn grab_berries(
 
 fn put_berries_in_cells(
     mut collision_events: EventReader<CollisionEvent>,
-    empty_berry_cells: Query<(Entity, &Team), (With<BerryCell>, Without<Berry>)>,
+    mut empty_berry_cells: Query<(Entity, &Team, &mut Sprite), (With<BerryCell>, Without<Berry>)>,
     players_with_berries: Query<(Entity, &Team), (With<Player>, With<Berry>, Without<Wings>)>,
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     let mut placed_berries_this_frame = HashSet::new();
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
             for (berry_cell_entity, player_entity) in [(entity1, entity2), (entity2, entity1)] {
-                if let Ok((berry_cell, berry_team)) = empty_berry_cells.get(*berry_cell_entity) {
+                if let Ok((berry_cell, berry_cell_team, mut berry_cell_sprite)) =
+                    empty_berry_cells.get_mut(*berry_cell_entity)
+                {
                     if let Ok((player, player_team)) = players_with_berries.get(*player_entity) {
                         if placed_berries_this_frame.contains(&player) {
                             continue;
                         }
-                        if berry_team == player_team {
-                            commands.entity(player).remove::<Berry>();
-                            commands.entity(berry_cell).insert(Berry);
+                        if berry_cell_team == player_team {
+                            commands
+                                .entity(player)
+                                .remove::<Berry>()
+                                .despawn_descendants();
+                            let berry_texture: Handle<Image> = asset_server.load("berry.png");
+                            berry_cell_sprite.color = Color::WHITE;
+                            commands
+                                .entity(berry_cell)
+                                .insert(Berry)
+                                .insert(berry_texture);
                             placed_berries_this_frame.insert(player);
                         }
                     }
                 }
             }
         };
-    }
-}
-
-fn color_cells_with_berry(
-    mut berry_cells: Query<(Has<Berry>, &mut Sprite, &Team), With<BerryCell>>,
-) {
-    for (has_berry, mut sprite, team) in berry_cells.iter_mut() {
-        sprite.color = team.color(has_berry);
     }
 }

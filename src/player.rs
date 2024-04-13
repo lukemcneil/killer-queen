@@ -30,7 +30,7 @@ const SPRITE_TILE_WIDTH: f32 = 128.0;
 const SPRITE_TILE_HEIGHT: f32 = 256.0;
 const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
 
-const WORKER_RENDER_WIDTH: f32 = 32.0;
+pub const WORKER_RENDER_WIDTH: f32 = 32.0;
 pub const WORKER_RENDER_HEIGHT: f32 = 40.0;
 const QUEEN_RENDER_WIDTH: f32 = 48.0;
 const QUEEN_RENDER_HEIGHT: f32 = 60.0;
@@ -63,7 +63,6 @@ impl Plugin for PlayerPlugin {
                             apply_idle_sprite.after(movement),
                             apply_jump_sprite,
                             join,
-                            color_players_with_berry,
                         )
                             .after(check_if_players_on_ground),
                     )
@@ -102,12 +101,10 @@ pub enum Team {
 pub struct Crown;
 
 impl Team {
-    pub fn color(&self, has_berry: bool) -> Color {
-        match (self, has_berry) {
-            (Team::Red, true) => Color::rgb_u8(171, 35, 40),
-            (Team::Red, false) => Color::rgb_u8(235, 33, 46),
-            (Team::Blue, true) => Color::rgb_u8(0, 68, 129),
-            (Team::Blue, false) => Color::rgb_u8(46, 103, 248),
+    pub fn color(&self) -> Color {
+        match self {
+            Team::Red => Color::rgb_u8(235, 33, 46),
+            Team::Blue => Color::rgb_u8(46, 103, 248),
         }
     }
 }
@@ -191,7 +188,7 @@ fn join(
                                     Team::Blue => WINDOW_WIDTH / 20.0,
                                 },
                                 WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
-                                0.0,
+                                2.0,
                             ),
                             ..Default::default()
                         },
@@ -210,6 +207,7 @@ fn join(
                                 x: player_width,
                                 y: player_height,
                             }),
+                            color: team.color(),
                             ..Default::default()
                         },
 
@@ -467,7 +465,10 @@ fn apply_jump_sprite(
 
 fn update_sprite_direction(
     mut query: Query<(&mut Sprite, &Direction, Option<&Children>), With<Player>>,
-    mut crowns: Query<&mut Sprite, (With<Crown>, Without<Player>)>,
+    mut player_accessories: Query<
+        (&mut Sprite, &mut Transform),
+        (Or<(With<Crown>, With<Berry>)>, Without<Player>),
+    >,
 ) {
     for (mut sprite, direction, maybe_children) in query.iter_mut() {
         let should_flip_x = match direction {
@@ -477,8 +478,10 @@ fn update_sprite_direction(
         sprite.flip_x = should_flip_x;
         if let Some(children) = maybe_children {
             for child in children {
-                if let Ok(mut crown_sprite) = crowns.get_mut(*child) {
-                    crown_sprite.flip_x = should_flip_x;
+                if let Ok((mut sprite, mut transform)) = player_accessories.get_mut(*child) {
+                    sprite.flip_x = should_flip_x;
+                    transform.translation.x =
+                        if should_flip_x { 1.0 } else { -1.0 } * transform.translation.x.abs();
                 }
             }
         }
@@ -614,11 +617,5 @@ fn check_if_players_on_ground(
                 player.is_on_ground = true;
             }
         }
-    }
-}
-
-fn color_players_with_berry(mut players: Query<(Has<Berry>, &mut Sprite, &Team), With<Player>>) {
-    for (has_berry, mut sprite, team) in players.iter_mut() {
-        sprite.color = team.color(has_berry);
     }
 }
