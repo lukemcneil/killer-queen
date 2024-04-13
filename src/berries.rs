@@ -4,7 +4,8 @@ use bevy_rapier2d::prelude::*;
 use crate::{
     platforms::PLATFORM_HEIGHT,
     player::{Player, Team, Wings, WORKER_RENDER_WIDTH},
-    WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH,
+    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y,
+    WINDOW_WIDTH,
 };
 
 const BERRY_RENDER_RADIUS: f32 = 10.0;
@@ -13,9 +14,19 @@ pub struct BerriesPlugin;
 
 impl Plugin for BerriesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, (grab_berries, put_berries_in_cells));
+        app.init_resource::<BerriesCollected>()
+            .add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (grab_berries, put_berries_in_cells, check_for_berry_win),
+            );
     }
+}
+
+#[derive(Default, Resource)]
+pub struct BerriesCollected {
+    red_berries: i32,
+    blue_berries: i32,
 }
 
 #[derive(Component)]
@@ -224,6 +235,7 @@ fn put_berries_in_cells(
     players_with_berries: Query<(Entity, &Team), (With<Player>, With<Berry>, Without<Wings>)>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut berries_collected: ResMut<BerriesCollected>,
 ) {
     let mut placed_berries_this_frame = HashSet::new();
     for collision_event in collision_events.read() {
@@ -237,6 +249,10 @@ fn put_berries_in_cells(
                             continue;
                         }
                         if berry_cell_team == player_team {
+                            match player_team {
+                                Team::Red => berries_collected.red_berries += 1,
+                                Team::Blue => berries_collected.blue_berries += 1,
+                            };
                             commands
                                 .entity(player)
                                 .remove::<Berry>()
@@ -253,5 +269,24 @@ fn put_berries_in_cells(
                 }
             }
         };
+    }
+}
+
+fn check_for_berry_win(
+    mut ev_win: EventWriter<WinEvent>,
+    berries_collected: Res<BerriesCollected>,
+) {
+    let win_condition = WinCondition::Economic;
+    if berries_collected.red_berries >= 12 {
+        ev_win.send(WinEvent {
+            team: Team::Red,
+            win_condition,
+        });
+    }
+    if berries_collected.blue_berries >= 12 {
+        ev_win.send(WinEvent {
+            team: Team::Blue,
+            win_condition,
+        });
     }
 }
