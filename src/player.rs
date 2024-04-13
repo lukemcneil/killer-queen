@@ -50,6 +50,7 @@ impl Plugin for PlayerPlugin {
             .init_resource::<JoinedPlayers>()
             .init_resource::<QueenDeaths>()
             .add_event::<KnockBackEvent>()
+            .add_systems(Startup, setup)
             .add_systems(
                 Update,
                 (
@@ -74,6 +75,7 @@ impl Plugin for PlayerPlugin {
                     players_attack,
                     apply_knockbacks.after(players_attack),
                     check_for_queen_death_win,
+                    update_queen_lives_counter,
                 ),
             );
     }
@@ -131,6 +133,47 @@ pub struct Player {
 
 #[derive(Component)]
 pub struct Wings;
+
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    for team in [Team::Red, Team::Blue] {
+        let font = asset_server.load("fonts/FiraSans-Bold.ttf");
+        let text_style = TextStyle {
+            font: font.clone(),
+            font_size: 40.0,
+            color: team.color(),
+        };
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section("", text_style.clone()),
+                transform: Transform::from_translation(Vec3::new(
+                    match team {
+                        Team::Red => -WINDOW_WIDTH / 20.0,
+                        Team::Blue => WINDOW_WIDTH / 20.0,
+                    },
+                    WINDOW_TOP_Y - (WINDOW_HEIGHT / 30.0),
+                    2.0,
+                )),
+                ..Default::default()
+            },
+            team,
+        ));
+    }
+}
+
+fn update_queen_lives_counter(
+    mut counters: Query<(&mut Text, &Team)>,
+    queen_deaths: Res<QueenDeaths>,
+) {
+    for (mut counter_text, counter_team) in counters.iter_mut() {
+        counter_text.sections[0].value = format!(
+            "Lives: {}",
+            3 - match counter_team {
+                Team::Red => queen_deaths.red_deaths,
+                Team::Blue => queen_deaths.blue_deaths,
+            }
+        )
+    }
+}
 
 fn join(
     mut commands: Commands,
