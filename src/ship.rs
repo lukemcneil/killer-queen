@@ -7,14 +7,16 @@ use crate::{
         Action, Direction, KnockBackEvent, Player, Team, Wings, PLAYER_JUMP_IMPULSE,
         WORKER_RENDER_HEIGHT,
     },
-    WINDOW_BOTTOM_Y, WINDOW_HEIGHT,
+    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_WIDTH,
 };
 
 pub struct ShipPlugin;
 
 const SHIP_WIDTH: f32 = 124.0 / 2.0;
 const SHIP_HEIGHT: f32 = 67.0 / 2.0;
-const SHIP_SPEED: f32 = 15.0;
+const SHIP_SPEED: f32 = 20.0;
+const SHIP_WIN_SPOT: f32 = WINDOW_WIDTH / 2.0 - WINDOW_WIDTH / 18.0;
+const SHIP_WIN_SPOT_WIDTH: f32 = 50.0;
 
 impl Plugin for ShipPlugin {
     fn build(&self, app: &mut App) {
@@ -25,6 +27,7 @@ impl Plugin for ShipPlugin {
                 move_ship,
                 jump_off_ship,
                 color_ships_with_drivers,
+                check_for_ship_win,
             ),
         );
     }
@@ -68,11 +71,24 @@ impl ShipBundle {
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(ShipBundle::new(
-        0.0,
-        WINDOW_BOTTOM_Y + WINDOW_HEIGHT / 36.0,
-        &asset_server,
-    ));
+    let y = WINDOW_BOTTOM_Y + WINDOW_HEIGHT / 36.0;
+    commands.spawn(ShipBundle::new(0.0, y, &asset_server));
+    let texture = asset_server.load("ship-target.png");
+    for (sign, team) in [(-1.0, Team::Red), (1.0, Team::Blue)] {
+        commands.spawn(SpriteBundle {
+            texture: texture.clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(SHIP_WIN_SPOT_WIDTH, SHIP_WIN_SPOT_WIDTH)),
+                color: team.color(),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(SHIP_WIN_SPOT * sign, y, -1.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+    }
 }
 
 fn get_on_ship(
@@ -158,5 +174,19 @@ fn color_ships_with_drivers(
             Some(team) => team.color(),
             None => Color::WHITE,
         };
+    }
+}
+
+fn check_for_ship_win(
+    mut ships: Query<(&Transform, &Team), With<Ship>>,
+    mut ev_win: EventWriter<WinEvent>,
+) {
+    for (transform, &team) in ships.iter_mut() {
+        if transform.translation.x.abs() > SHIP_WIN_SPOT {
+            ev_win.send(WinEvent {
+                team,
+                win_condition: WinCondition::Ship,
+            });
+        }
     }
 }

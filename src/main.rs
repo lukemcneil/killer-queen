@@ -15,7 +15,7 @@ use bevy_rapier2d::prelude::*;
 use gates::GatePlugin;
 use iyes_perf_ui::{diagnostics::PerfUiEntryFPS, PerfUiPlugin, PerfUiRoot};
 use platforms::PlatformsPlugin;
-use player::PlayerPlugin;
+use player::{PlayerPlugin, Team};
 use ship::ShipPlugin;
 
 const WINDOW_WIDTH: f32 = 1920.0;
@@ -56,7 +56,9 @@ fn main() {
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(PerfUiPlugin)
         // .add_plugins(WorldInspectorPlugin::new())
+        .add_event::<WinEvent>()
         .add_systems(Startup, setup)
+        .add_systems(Update, set_win_text)
         .run();
 }
 
@@ -111,5 +113,48 @@ fn setup(mut commands: Commands) {
             })
             .insert(RigidBody::Fixed)
             .insert(Collider::cuboid(0.5, 0.5));
+    }
+}
+
+#[derive(Debug)]
+pub enum WinCondition {
+    Military,
+    Economic,
+    Ship,
+}
+
+#[derive(Event)]
+pub struct WinEvent {
+    pub team: Team,
+    pub win_condition: WinCondition,
+}
+
+fn set_win_text(
+    mut ev_win: EventReader<WinEvent>,
+    mut game_over: Local<bool>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+) {
+    if *game_over {
+        return;
+    }
+    for win_event in ev_win.read() {
+        *game_over = true;
+        let font = asset_server.load("fonts/FiraSans-Bold.ttf");
+        let text_style = TextStyle {
+            font: font.clone(),
+            font_size: 60.0,
+            color: win_event.team.color(),
+        };
+        commands.spawn(Text2dBundle {
+            text: Text::from_section(
+                format!(
+                    "Team {:?} wins by {:?}",
+                    win_event.team, win_event.win_condition
+                ),
+                text_style.clone(),
+            ),
+            ..Default::default()
+        });
     }
 }

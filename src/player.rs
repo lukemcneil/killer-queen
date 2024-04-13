@@ -93,7 +93,7 @@ pub enum Direction {
     Left,
 }
 
-#[derive(Component, PartialEq, Eq, Clone, Copy)]
+#[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Team {
     Red,
     Blue,
