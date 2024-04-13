@@ -4,6 +4,7 @@ mod animation;
 mod berries;
 mod platforms;
 mod player;
+mod ship;
 
 use animation::AnimationPlugin;
 use berries::BerriesPlugin;
@@ -12,6 +13,7 @@ use bevy::{prelude::*, window::WindowResolution};
 use bevy_rapier2d::prelude::*;
 use platforms::PlatformsPlugin;
 use player::PlayerPlugin;
+use ship::ShipPlugin;
 
 const WINDOW_WIDTH: f32 = 1500.0;
 const WINDOW_HEIGHT: f32 = 800.0;
@@ -45,6 +47,7 @@ fn main() {
             PlayerPlugin,
             AnimationPlugin,
             BerriesPlugin,
+            ShipPlugin,
         ))
         // .add_plugins(WorldInspectorPlugin::new())
         .add_systems(Startup, setup)

@@ -7,6 +7,7 @@ use leafwing_input_manager::prelude::*;
 use crate::{
     animation::Animation,
     berries::{Berry, BerryBundle},
+    ship::RidingOnShip,
     WINDOW_BOTTOM_Y, WINDOW_LEFT_X, WINDOW_RIGHT_X,
 };
 
@@ -14,7 +15,7 @@ const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
 const PLAYER_FLY_IMPULSE: f32 = 67.5;
-const PLAYER_JUMP_IMPULSE: f32 = 55.0;
+pub const PLAYER_JUMP_IMPULSE: f32 = 55.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 50.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
@@ -30,7 +31,7 @@ const SPRITE_TILE_HEIGHT: f32 = 256.0;
 const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
 
 const WORKER_RENDER_WIDTH: f32 = 32.0;
-const WORKER_RENDER_HEIGHT: f32 = 40.0;
+pub const WORKER_RENDER_HEIGHT: f32 = 40.0;
 const QUEEN_RENDER_WIDTH: f32 = 48.0;
 const QUEEN_RENDER_HEIGHT: f32 = 60.0;
 
@@ -79,7 +80,7 @@ impl Plugin for PlayerPlugin {
 struct JoinedPlayers(pub HashMap<Gamepad, Entity>);
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
-enum Action {
+pub enum Action {
     Move,
     Jump,
     Disconnect,
@@ -91,7 +92,7 @@ enum Direction {
     Left,
 }
 
-#[derive(Component, PartialEq, Eq)]
+#[derive(Component, PartialEq, Eq, Clone, Copy)]
 pub enum Team {
     Red,
     Blue,
@@ -331,27 +332,65 @@ fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity, &Player)>, time: 
 
 fn disconnect(
     mut commands: Commands,
-    action_query: Query<(&ActionState<Action>, &Player, Has<Berry>, &Transform)>,
+    action_query: Query<(
+        Entity,
+        &ActionState<Action>,
+        &Player,
+        Has<Berry>,
+        &Transform,
+        Option<&RidingOnShip>,
+    )>,
     mut joined_players: ResMut<JoinedPlayers>,
     asset_server: Res<AssetServer>,
 ) {
-    for (action_state, player, killed_has_berry, killed_player_transform) in action_query.iter() {
+    for (
+        player_entity,
+        action_state,
+        player,
+        killed_has_berry,
+        killed_player_transform,
+        maybe_riding_on_ship,
+    ) in action_query.iter()
+    {
         if action_state.pressed(&Action::Disconnect) {
-            let player_entity = *joined_players.0.get(&player.gamepad).unwrap();
-
-            // Despawn thea disconnected player and remove them from the joined player list
-            commands.entity(player_entity).despawn_recursive();
-            joined_players.0.remove(&player.gamepad);
-
-            if killed_has_berry {
-                commands.spawn(BerryBundle::new(
-                    killed_player_transform.translation.x,
-                    killed_player_transform.translation.y,
-                    RigidBody::Dynamic,
-                    &asset_server,
-                ));
-            }
+            remove_player(
+                &mut commands,
+                player_entity,
+                &mut joined_players,
+                player,
+                killed_has_berry,
+                killed_player_transform,
+                &asset_server,
+                maybe_riding_on_ship,
+            );
         }
+    }
+}
+
+fn remove_player(
+    commands: &mut Commands,
+    player_entity: Entity,
+    joined_players: &mut ResMut<JoinedPlayers>,
+    player: &Player,
+    has_berry: bool,
+    transform: &Transform,
+    asset_server: &Res<AssetServer>,
+    maybe_riding_on_ship: Option<&RidingOnShip>,
+) {
+    // Despawn the disconnected player and remove them from the joined player list
+    commands.entity(player_entity).despawn_recursive();
+    joined_players.0.remove(&player.gamepad);
+
+    if has_berry {
+        commands.spawn(BerryBundle::new(
+            transform.translation.x,
+            transform.translation.y,
+            RigidBody::Dynamic,
+            &asset_server,
+        ));
+    }
+    if let Some(riding_on_ship) = maybe_riding_on_ship {
+        commands.entity(riding_on_ship.ship).remove::<Team>();
     }
 }
 
@@ -457,6 +496,7 @@ fn players_attack(
             Has<Berry>,
             &Direction,
             &Sprite,
+            Option<&RidingOnShip>,
         ),
         With<Player>,
     >,
@@ -532,21 +572,22 @@ fn players_attack(
                     killed_has_berry,
                     _,
                     _,
+                    maybe_riding_on_ship,
                 ) = killed_player_components;
-                let (_, _, _, killer_team, _, _, _, _) = killer_player_components;
+                let (_, _, _, killer_team, _, _, _, _, _) = killer_player_components;
                 if killed_team == killer_team {
                     continue;
                 }
-                if killed_has_berry {
-                    commands.spawn(BerryBundle::new(
-                        killed_player_transform.translation.x,
-                        killed_player_transform.translation.y,
-                        RigidBody::Dynamic,
-                        &asset_server,
-                    ));
-                }
-                commands.entity(killed_entity).despawn_recursive();
-                joined_players.0.remove(&killed_player.gamepad);
+                remove_player(
+                    &mut commands,
+                    killed_entity,
+                    &mut joined_players,
+                    killed_player,
+                    killed_has_berry,
+                    killed_player_transform,
+                    &asset_server,
+                    maybe_riding_on_ship,
+                );
             }
         }
     }
