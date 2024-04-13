@@ -102,6 +102,9 @@ pub enum Team {
 #[derive(Component)]
 pub struct Crown;
 
+#[derive(Component)]
+pub struct Queen;
+
 impl Team {
     pub fn color(&self) -> Color {
         match self {
@@ -246,6 +249,7 @@ fn join(
                 ));
                 if join_as_queen {
                     player.insert(Wings);
+                    player.insert(Queen);
                 }
 
                 if join_as_queen {

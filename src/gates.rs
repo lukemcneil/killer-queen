@@ -4,7 +4,7 @@ use bevy_rapier2d::prelude::*;
 use crate::{
     berries::Berry,
     player::{
-        Crown, Player, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RENDER_HEIGHT,
+        Crown, Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RENDER_HEIGHT,
         QUEEN_RENDER_WIDTH, WORKER_RENDER_HEIGHT, WORKER_RENDER_WIDTH,
     },
     WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
@@ -90,8 +90,8 @@ struct GateTimer {
 }
 
 fn check_worker_gate_collisions(
-    players_with_berries: Query<Has<GateTimer>, (With<Player>, With<Berry>)>,
-    gates: Query<Entity, With<Gate>>,
+    players_with_berries: Query<(Has<GateTimer>, Has<Berry>, Has<Queen>, &Team), With<Player>>,
+    mut gates: Query<(Option<&Team>, &mut Sprite), With<Gate>>,
     mut collision_events: EventReader<CollisionEvent>,
     mut commands: Commands,
 ) {
@@ -99,10 +99,20 @@ fn check_worker_gate_collisions(
         match collision_event {
             CollisionEvent::Started(entity1, entity2, _) => {
                 for (gate_entity, player_entity) in [(entity1, entity2), (entity2, entity1)] {
-                    if let Ok(_) = gates.get(*gate_entity) {
-                        if let Ok(player_has_gate_timer) = players_with_berries.get(*player_entity)
+                    if let Ok((maybe_gate_team, mut gate_sprite)) = gates.get_mut(*gate_entity) {
+                        if let Ok((player_has_gate_timer, player_has_berry, is_queen, team)) =
+                            players_with_berries.get(*player_entity)
                         {
-                            if !player_has_gate_timer {
+                            if is_queen {
+                                commands.entity(*gate_entity).insert(*team);
+                                gate_sprite.color = team.color();
+                            }
+                            if let Some(gate_team) = maybe_gate_team {
+                                if gate_team != team {
+                                    continue;
+                                }
+                            }
+                            if !player_has_gate_timer && player_has_berry {
                                 commands.entity(*player_entity).insert(GateTimer {
                                     timer: Timer::from_seconds(1.0, TimerMode::Once),
                                 });
@@ -113,10 +123,11 @@ fn check_worker_gate_collisions(
             }
             CollisionEvent::Stopped(entity1, entity2, _) => {
                 for (gate_entity, player_entity) in [(entity1, entity2), (entity2, entity1)] {
-                    if let Ok(_) = gates.get(*gate_entity) {
-                        if let Ok(player_has_gate_timer) = players_with_berries.get(*player_entity)
+                    if gates.get(*gate_entity).is_ok() {
+                        if let Ok((player_has_gate_timer, player_has_berry, _, _)) =
+                            players_with_berries.get(*player_entity)
                         {
-                            if player_has_gate_timer {
+                            if player_has_berry && player_has_gate_timer {
                                 commands.entity(*player_entity).remove::<GateTimer>();
                             }
                         }
