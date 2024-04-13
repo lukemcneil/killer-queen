@@ -2,12 +2,15 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::action_state::ActionState;
 
-use crate::player::{Action, Player, Team, Wings, PLAYER_JUMP_IMPULSE, WORKER_RENDER_HEIGHT};
+use crate::{
+    player::{Action, Player, Team, Wings, PLAYER_JUMP_IMPULSE, WORKER_RENDER_HEIGHT},
+    WINDOW_BOTTOM_Y, WINDOW_HEIGHT,
+};
 
 pub struct ShipPlugin;
 
-const SHIP_WIDTH: f32 = 124.0;
-const SHIP_HEIGHT: f32 = 67.0;
+const SHIP_WIDTH: f32 = 124.0 / 2.0;
+const SHIP_HEIGHT: f32 = 67.0 / 2.0;
 const SHIP_SPEED: f32 = 15.0;
 
 impl Plugin for ShipPlugin {
@@ -62,7 +65,11 @@ impl ShipBundle {
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(ShipBundle::new(0.0, -150.0, &asset_server));
+    commands.spawn(ShipBundle::new(
+        0.0,
+        WINDOW_BOTTOM_Y + WINDOW_HEIGHT / 36.0,
+        &asset_server,
+    ));
 }
 
 fn get_on_ship(

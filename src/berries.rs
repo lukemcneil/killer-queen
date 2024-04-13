@@ -2,8 +2,9 @@ use bevy::{prelude::*, utils::HashSet};
 use bevy_rapier2d::prelude::*;
 
 use crate::{
+    platforms::PLATFORM_HEIGHT,
     player::{Player, Team, Wings},
-    WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X, WINDOW_WIDTH,
+    WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const BERRY_RENDER_RADIUS: f32 = 10.0;
@@ -91,29 +92,85 @@ impl BerryCellBundle {
     }
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let num_berries = 10;
-    for i in 0..num_berries {
-        let team = if i % 2 == 0 { Team::Red } else { Team::Blue };
-        let berry_spread_width = WINDOW_WIDTH / 2.0;
-        let x = (-berry_spread_width / 2.0)
-            + (berry_spread_width / (num_berries as f32 + 1.0)) * (i + 1) as f32;
+fn spawn_berry_bunch(x: f32, y: f32, commands: &mut Commands, asset_server: &Res<AssetServer>) {
+    for i in [-1.0, 0.0, 1.0] {
         commands.spawn(BerryBundle::new(
-            x,
-            WINDOW_HEIGHT / 5.0,
+            x + i * BERRY_RENDER_RADIUS * 2.0,
+            y,
             RigidBody::Fixed,
-            &asset_server,
+            asset_server,
         ));
-        commands.spawn(BerryCellBundle::new(
-            if i % 2 == 0 {
-                WINDOW_LEFT_X + 100.0
-            } else {
-                WINDOW_RIGHT_X - 100.0
-            },
-            WINDOW_BOTTOM_Y + BERRY_RENDER_RADIUS * 2.0 * (i + 1) as f32,
-            team,
-            &asset_server,
+    }
+    for i in [-0.5, 0.5] {
+        commands.spawn(BerryBundle::new(
+            x + i * BERRY_RENDER_RADIUS * 2.0,
+            y + BERRY_RENDER_RADIUS * 3.0 / 2.0,
+            RigidBody::Fixed,
+            asset_server,
         ));
+    }
+    commands.spawn(BerryBundle::new(
+        x,
+        y + BERRY_RENDER_RADIUS * 3.0,
+        RigidBody::Fixed,
+        asset_server,
+    ));
+}
+
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    for (x, y) in [
+        // layer 0
+        (
+            (WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0),
+            WINDOW_BOTTOM_Y + PLATFORM_HEIGHT,
+        ),
+        (
+            -(WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0),
+            WINDOW_BOTTOM_Y + PLATFORM_HEIGHT,
+        ),
+        // layer 1
+        (0.0, WINDOW_BOTTOM_Y + WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT),
+        // layer 2
+        (
+            0.0,
+            WINDOW_BOTTOM_Y + 2.0 * WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT,
+        ),
+        (
+            (WINDOW_RIGHT_X - WINDOW_WIDTH / 7.0),
+            WINDOW_BOTTOM_Y + 2.0 * WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT,
+        ),
+        (
+            -(WINDOW_RIGHT_X - WINDOW_WIDTH / 7.0),
+            WINDOW_BOTTOM_Y + 2.0 * WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT,
+        ),
+        // layer 3
+        (
+            WINDOW_WIDTH / 10.0,
+            WINDOW_BOTTOM_Y + 3.0 * WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT,
+        ),
+        (
+            -WINDOW_WIDTH / 10.0,
+            WINDOW_BOTTOM_Y + 3.0 * WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT,
+        ),
+    ] {
+        spawn_berry_bunch(x, y, &mut commands, &asset_server)
+    }
+
+    for team in [Team::Red, Team::Blue] {
+        for x in -2..2 {
+            for y in 0..3 {
+                let sign = match team {
+                    Team::Red => -1.0,
+                    Team::Blue => 1.0,
+                };
+                commands.spawn(BerryCellBundle::new(
+                    (WINDOW_WIDTH / 20.0 + x as f32 * BERRY_RENDER_RADIUS * 2.1) * sign,
+                    WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0) + y as f32 * BERRY_RENDER_RADIUS * 2.1,
+                    team,
+                    &asset_server,
+                ));
+            }
+        }
     }
 }
 

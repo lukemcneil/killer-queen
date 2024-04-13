@@ -8,14 +8,14 @@ use crate::{
     animation::Animation,
     berries::{Berry, BerryBundle},
     ship::RidingOnShip,
-    WINDOW_BOTTOM_Y, WINDOW_LEFT_X, WINDOW_RIGHT_X,
+    WINDOW_HEIGHT, WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
 const PLAYER_FLY_IMPULSE: f32 = 67.5;
-pub const PLAYER_JUMP_IMPULSE: f32 = 55.0;
+pub const PLAYER_JUMP_IMPULSE: f32 = 45.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 50.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
@@ -187,10 +187,10 @@ fn join(
                         transform: Transform {
                             translation: Vec3::new(
                                 match team {
-                                    Team::Red => WINDOW_LEFT_X + 100.0,
-                                    Team::Blue => WINDOW_RIGHT_X - 100.0,
+                                    Team::Red => -WINDOW_WIDTH / 20.0,
+                                    Team::Blue => WINDOW_WIDTH / 20.0,
                                 },
-                                WINDOW_BOTTOM_Y + 300.0,
+                                WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
                                 0.0,
                             ),
                             ..Default::default()
