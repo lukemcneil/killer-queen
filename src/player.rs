@@ -8,7 +8,7 @@ use crate::{
     animation::Animation,
     berries::{Berry, BerryBundle},
     ship::RidingOnShip,
-    WINDOW_HEIGHT, WINDOW_TOP_Y, WINDOW_WIDTH,
+    WinCondition, WinEvent, WINDOW_HEIGHT, WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
@@ -48,6 +48,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InputManagerPlugin::<Action>::default())
             .init_resource::<JoinedPlayers>()
+            .init_resource::<QueenDeaths>()
             .add_event::<KnockBackEvent>()
             .add_systems(
                 Update,
@@ -72,6 +73,7 @@ impl Plugin for PlayerPlugin {
                     disconnect,
                     players_attack,
                     apply_knockbacks.after(players_attack),
+                    check_for_queen_death_win,
                 ),
             );
     }
@@ -104,6 +106,12 @@ pub struct Crown;
 
 #[derive(Component)]
 pub struct Queen;
+
+#[derive(Default, Resource)]
+pub struct QueenDeaths {
+    red_deaths: i32,
+    blue_deaths: i32,
+}
 
 impl Team {
     pub fn color(&self) -> Color {
@@ -513,6 +521,7 @@ fn players_attack(
             &Direction,
             &Sprite,
             Option<&RidingOnShip>,
+            Has<Queen>,
         ),
         With<Player>,
     >,
@@ -520,6 +529,7 @@ fn players_attack(
     mut joined_players: ResMut<JoinedPlayers>,
     asset_server: Res<AssetServer>,
     mut ev_knockback: EventWriter<KnockBackEvent>,
+    mut queen_deaths: ResMut<QueenDeaths>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
@@ -618,14 +628,21 @@ fn players_attack(
                         killed_entity,
                         killed_player_transform,
                         killed_player,
-                        _,
+                        killed_player_team,
                         _,
                         killed_has_berry,
                         _,
                         _,
                         maybe_riding_on_ship,
+                        killed_player_is_queen,
                     ) = killed_player_components;
 
+                    if killed_player_is_queen {
+                        match killed_player_team {
+                            Team::Red => queen_deaths.red_deaths += 1,
+                            Team::Blue => queen_deaths.blue_deaths += 1,
+                        }
+                    }
                     remove_player(
                         &mut commands,
                         killed_entity,
@@ -677,5 +694,21 @@ fn check_if_players_on_ground(
                 player.is_on_ground = true;
             }
         }
+    }
+}
+
+fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Res<QueenDeaths>) {
+    let win_condition = WinCondition::Military;
+    if queen_deaths.red_deaths >= 3 {
+        ev_win.send(WinEvent {
+            team: Team::Blue,
+            win_condition,
+        });
+    }
+    if queen_deaths.blue_deaths >= 3 {
+        ev_win.send(WinEvent {
+            team: Team::Red,
+            win_condition,
+        });
     }
 }

@@ -116,7 +116,7 @@ fn setup(mut commands: Commands) {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum WinCondition {
     Military,
     Economic,
