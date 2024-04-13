@@ -833,6 +833,7 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui",
  "bevy_rapier2d",
+ "iyes_perf_ui",
  "leafwing-input-manager",
  "rand",
 ]
@@ -2384,6 +2385,15 @@ name = "itoa"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
+
+[[package]]
+name = "iyes_perf_ui"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a49f5aa5866dadfdd274c45eddc0a94c84ad1ce0c02c27bcb33c34a20b961f9e"
+dependencies = [
+ "bevy",
+]
 
 [[package]]
 name = "jni"

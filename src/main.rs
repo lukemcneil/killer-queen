@@ -11,12 +11,13 @@ use berries::BerriesPlugin;
 use bevy::{prelude::*, window::WindowResolution};
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
+use iyes_perf_ui::{diagnostics::PerfUiEntryFPS, PerfUiPlugin, PerfUiRoot};
 use platforms::PlatformsPlugin;
 use player::PlayerPlugin;
 use ship::ShipPlugin;
 
 const WINDOW_WIDTH: f32 = 1920.0;
-const WINDOW_HEIGHT: f32 = 1000.0;
+const WINDOW_HEIGHT: f32 = 1016.0;
 
 pub const WINDOW_BOTTOM_Y: f32 = WINDOW_HEIGHT / -2.0;
 pub const WINDOW_LEFT_X: f32 = WINDOW_WIDTH / -2.0;
@@ -49,12 +50,22 @@ fn main() {
             BerriesPlugin,
             ShipPlugin,
         ))
+        .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
+        .add_plugins(PerfUiPlugin)
         // .add_plugins(WorldInspectorPlugin::new())
         .add_systems(Startup, setup)
         .run();
 }
 
 fn setup(mut commands: Commands) {
+    commands.spawn((
+        PerfUiRoot {
+            display_labels: false,
+            layout_horizontal: true,
+            ..default()
+        },
+        PerfUiEntryFPS::default(),
+    ));
     commands.spawn(Camera2dBundle::default());
 
     for y in [
