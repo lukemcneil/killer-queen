@@ -2,6 +2,7 @@
 
 mod animation;
 mod berries;
+mod gates;
 mod platforms;
 mod player;
 mod ship;
@@ -11,6 +12,7 @@ use berries::BerriesPlugin;
 use bevy::{prelude::*, window::WindowResolution};
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
+use gates::GatePlugin;
 use iyes_perf_ui::{diagnostics::PerfUiEntryFPS, PerfUiPlugin, PerfUiRoot};
 use platforms::PlatformsPlugin;
 use player::PlayerPlugin;
@@ -49,6 +51,7 @@ fn main() {
             AnimationPlugin,
             BerriesPlugin,
             ShipPlugin,
+            GatePlugin,
         ))
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(PerfUiPlugin)
