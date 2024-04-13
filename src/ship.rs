@@ -103,8 +103,8 @@ fn move_ship(
     for (mut worker_transform, riding_on_ship) in workers_on_ships.iter_mut() {
         let (team, mut ship_transform) = ships.get_mut(riding_on_ship.ship).unwrap();
         let direction = match team {
-            Team::Red => 1.0,
-            Team::Blue => -1.0,
+            Team::Red => -1.0,
+            Team::Blue => 1.0,
         };
         ship_transform.translation.x += direction * SHIP_SPEED * time.delta_seconds();
         worker_transform.translation = ship_transform.translation;

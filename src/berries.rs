@@ -94,27 +94,33 @@ impl BerryCellBundle {
 
 fn spawn_berry_bunch(x: f32, y: f32, commands: &mut Commands, asset_server: &Res<AssetServer>) {
     for i in [-1.0, 0.0, 1.0] {
-        commands.spawn(BerryBundle::new(
-            x + i * BERRY_RENDER_RADIUS * 2.0,
-            y,
-            RigidBody::Fixed,
-            asset_server,
-        ));
+        commands
+            .spawn(BerryBundle::new(
+                x + i * BERRY_RENDER_RADIUS * 2.0,
+                y,
+                RigidBody::Fixed,
+                asset_server,
+            ))
+            .insert(Sensor);
     }
     for i in [-0.5, 0.5] {
-        commands.spawn(BerryBundle::new(
-            x + i * BERRY_RENDER_RADIUS * 2.0,
-            y + BERRY_RENDER_RADIUS * 3.0 / 2.0,
+        commands
+            .spawn(BerryBundle::new(
+                x + i * BERRY_RENDER_RADIUS * 2.0,
+                y + BERRY_RENDER_RADIUS * 3.0 / 2.0,
+                RigidBody::Fixed,
+                asset_server,
+            ))
+            .insert(Sensor);
+    }
+    commands
+        .spawn(BerryBundle::new(
+            x,
+            y + BERRY_RENDER_RADIUS * 3.0,
             RigidBody::Fixed,
             asset_server,
-        ));
-    }
-    commands.spawn(BerryBundle::new(
-        x,
-        y + BERRY_RENDER_RADIUS * 3.0,
-        RigidBody::Fixed,
-        asset_server,
-    ));
+        ))
+        .insert(Sensor);
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
