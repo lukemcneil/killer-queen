@@ -3,7 +3,10 @@ use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::action_state::ActionState;
 
 use crate::{
-    player::{Action, Player, Team, Wings, PLAYER_JUMP_IMPULSE, WORKER_RENDER_HEIGHT},
+    player::{
+        Action, Direction, KnockBackEvent, Player, Team, Wings, PLAYER_JUMP_IMPULSE,
+        WORKER_RENDER_HEIGHT,
+    },
     WINDOW_BOTTOM_Y, WINDOW_HEIGHT,
 };
 
@@ -74,20 +77,34 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn get_on_ship(
     mut collision_events: EventReader<CollisionEvent>,
-    ships: Query<Entity, (With<Ship>, Without<Team>)>,
-    workers: Query<&Team, (With<Player>, Without<Wings>)>,
+    ships: Query<(Option<&Team>, &Transform), With<Ship>>,
+    workers: Query<(&Team, &Transform), (With<Player>, Without<Wings>)>,
     mut commands: Commands,
+    mut ev_knockback: EventWriter<KnockBackEvent>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
             for (ship_entity, player_entity) in [(entity1, entity2), (entity2, entity1)] {
-                if ships.get(*ship_entity).is_ok() {
-                    if let Ok(worker_team) = workers.get(*player_entity) {
-                        commands
-                            .entity(*player_entity)
-                            .insert(RigidBody::Fixed)
-                            .insert(RidingOnShip { ship: *ship_entity });
-                        commands.entity(*ship_entity).insert(*worker_team);
+                if let Ok((worker_team, worker_transform)) = workers.get(*player_entity) {
+                    if let Ok((maybe_ship_team, ship_transform)) = ships.get(*ship_entity) {
+                        if maybe_ship_team.is_none() {
+                            commands
+                                .entity(*player_entity)
+                                .insert(RigidBody::Fixed)
+                                .insert(RidingOnShip { ship: *ship_entity });
+                            commands.entity(*ship_entity).insert(*worker_team);
+                        } else {
+                            let direction =
+                                if worker_transform.translation.x < ship_transform.translation.x {
+                                    Direction::Left
+                                } else {
+                                    Direction::Right
+                                };
+                            ev_knockback.send(KnockBackEvent {
+                                entity: *player_entity,
+                                direction,
+                            });
+                        }
                     }
                 }
             }

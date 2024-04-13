@@ -48,6 +48,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InputManagerPlugin::<Action>::default())
             .init_resource::<JoinedPlayers>()
+            .add_event::<KnockBackEvent>()
             .add_systems(
                 Update,
                 (
@@ -70,6 +71,7 @@ impl Plugin for PlayerPlugin {
                         .before(players_attack),
                     disconnect,
                     players_attack,
+                    apply_knockbacks.after(players_attack),
                 ),
             );
     }
@@ -86,7 +88,7 @@ pub enum Action {
 }
 
 #[derive(Component)]
-enum Direction {
+pub enum Direction {
     Right,
     Left,
 }
@@ -220,8 +222,8 @@ fn join(
                     Name::new("Player"),
                     InputManagerBundle::with_map(input_map),
                     match team {
-                        Team::Red => Direction::Right,
-                        Team::Blue => Direction::Left,
+                        Team::Red => Direction::Left,
+                        Team::Blue => Direction::Right,
                     },
                     team,
                     (
@@ -488,6 +490,12 @@ fn update_sprite_direction(
     }
 }
 
+#[derive(Event)]
+pub struct KnockBackEvent {
+    pub entity: Entity,
+    pub direction: Direction,
+}
+
 fn players_attack(
     mut collision_events: EventReader<CollisionEvent>,
     players: Query<
@@ -507,12 +515,16 @@ fn players_attack(
     mut commands: Commands,
     mut joined_players: ResMut<JoinedPlayers>,
     asset_server: Res<AssetServer>,
+    mut ev_knockback: EventWriter<KnockBackEvent>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
             if let (Ok(player1_components), Ok(player2_components)) =
                 (players.get(*entity1), players.get(*entity2))
             {
+                if player1_components.3 == player2_components.3 {
+                    continue;
+                }
                 let player1_translation = player1_components.1.translation;
                 let player2_translation = player2_components.1.translation;
                 let player1_half_width = player1_components.7.custom_size.unwrap().x / 2.0
@@ -528,7 +540,7 @@ fn players_attack(
                 let one_player_on_top = (y_diff - (player1_half_height + player2_half_height))
                     > (x_diff - (player1_half_width + player2_half_width));
 
-                let (killed_player_components, killer_player_components) = {
+                if let Some((killed_player_components, _killer_player_components)) = {
                     let player1_has_wings = player1_components.4;
                     let player2_has_wings = player2_components.4;
                     match (player1_has_wings, player2_has_wings) {
@@ -537,9 +549,9 @@ fn players_attack(
                             if one_player_on_top {
                                 // one player on top
                                 if player1_translation.y > player2_translation.y {
-                                    (player2_components, player1_components)
+                                    Some((player2_components, player1_components))
                                 } else {
-                                    (player1_components, player2_components)
+                                    Some((player1_components, player2_components))
                                 }
                             } else {
                                 // hit each other horizontally
@@ -553,46 +565,90 @@ fn players_attack(
                                 let right_player_direction = right_player_components.6;
                                 match (left_player_direction, right_player_direction) {
                                     (Direction::Right, Direction::Right) => {
-                                        (right_player_components, left_player_components)
+                                        Some((right_player_components, left_player_components))
                                     }
                                     (Direction::Left, Direction::Left) => {
-                                        (left_player_components, right_player_components)
+                                        Some((left_player_components, right_player_components))
                                     }
-                                    _ => continue,
+                                    _ => {
+                                        // hit swords or backs
+                                        ev_knockback.send(KnockBackEvent {
+                                            entity: left_player_components.0,
+                                            direction: Direction::Left,
+                                        });
+                                        ev_knockback.send(KnockBackEvent {
+                                            entity: right_player_components.0,
+                                            direction: Direction::Right,
+                                        });
+                                        continue;
+                                    }
                                 }
                             }
                         }
-                        (true, false) => (player2_components, player1_components),
-                        (false, true) => (player1_components, player2_components),
-                        (false, false) => continue,
+                        (true, false) => Some((player2_components, player1_components)),
+                        (false, true) => Some((player1_components, player2_components)),
+                        (false, false) => {
+                            // both are workers
+                            if !one_player_on_top {
+                                let (left_player_components, right_player_components) =
+                                    if player1_translation.x < player2_translation.x {
+                                        (player1_components, player2_components)
+                                    } else {
+                                        (player2_components, player1_components)
+                                    };
+                                // workers hit
+                                ev_knockback.send(KnockBackEvent {
+                                    entity: left_player_components.0,
+                                    direction: Direction::Left,
+                                });
+                                ev_knockback.send(KnockBackEvent {
+                                    entity: right_player_components.0,
+                                    direction: Direction::Right,
+                                });
+                            }
+                            None
+                        }
                     }
+                } {
+                    let (
+                        killed_entity,
+                        killed_player_transform,
+                        killed_player,
+                        _,
+                        _,
+                        killed_has_berry,
+                        _,
+                        _,
+                        maybe_riding_on_ship,
+                    ) = killed_player_components;
+
+                    remove_player(
+                        &mut commands,
+                        killed_entity,
+                        &mut joined_players,
+                        killed_player,
+                        killed_has_berry,
+                        killed_player_transform,
+                        &asset_server,
+                        maybe_riding_on_ship,
+                    );
                 };
-                let (
-                    killed_entity,
-                    killed_player_transform,
-                    killed_player,
-                    killed_team,
-                    _,
-                    killed_has_berry,
-                    _,
-                    _,
-                    maybe_riding_on_ship,
-                ) = killed_player_components;
-                let (_, _, _, killer_team, _, _, _, _, _) = killer_player_components;
-                if killed_team == killer_team {
-                    continue;
-                }
-                remove_player(
-                    &mut commands,
-                    killed_entity,
-                    &mut joined_players,
-                    killed_player,
-                    killed_has_berry,
-                    killed_player_transform,
-                    &asset_server,
-                    maybe_riding_on_ship,
-                );
             }
+        }
+    }
+}
+
+fn apply_knockbacks(
+    mut ev_knockback: EventReader<KnockBackEvent>,
+    mut players: Query<&mut ExternalImpulse, With<Player>>,
+) {
+    for ev in ev_knockback.read() {
+        if let Ok(mut impulse) = players.get_mut(ev.entity) {
+            impulse.impulse.x += PLAYER_FLY_IMPULSE
+                * match ev.direction {
+                    Direction::Right => 1.0,
+                    Direction::Left => -1.0,
+                };
         }
     }
 }
