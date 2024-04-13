@@ -367,6 +367,7 @@ fn disconnect(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn remove_player(
     commands: &mut Commands,
     player_entity: Entity,
@@ -386,7 +387,7 @@ fn remove_player(
             transform.translation.x,
             transform.translation.y,
             RigidBody::Dynamic,
-            &asset_server,
+            asset_server,
         ));
     }
     if let Some(riding_on_ship) = maybe_riding_on_ship {

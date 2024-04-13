@@ -74,7 +74,7 @@ fn get_on_ship(
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
             for (ship_entity, player_entity) in [(entity1, entity2), (entity2, entity1)] {
-                if let Ok(_) = ships.get(*ship_entity) {
+                if ships.get(*ship_entity).is_ok() {
                     if let Ok(worker_team) = workers.get(*player_entity) {
                         commands
                             .entity(*player_entity)
