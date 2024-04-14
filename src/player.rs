@@ -1,15 +1,13 @@
 use std::{f32::MAX, time::Duration};
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::{
-    animation::Animation,
-    berries::{Berry, BerryBundle},
-    ship::RidingOnShip,
-    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X,
-    WINDOW_TOP_Y, WINDOW_WIDTH,
+    animation::Animation, berries::Berry, join::remove_player, ship::RidingOnShip, WinCondition,
+    WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X, WINDOW_TOP_Y,
+    WINDOW_WIDTH,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
@@ -22,25 +20,25 @@ const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 115.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.3;
-const PLAYER_GRAVITY_SCALE: f32 = 15.0;
+pub const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.5;
 
-const SPRITESHEET_COLS: usize = 7;
-const SPRITESHEET_ROWS: usize = 8;
+pub const SPRITESHEET_COLS: usize = 7;
+pub const SPRITESHEET_ROWS: usize = 8;
 
-const SPRITE_TILE_WIDTH: f32 = 128.0;
-const SPRITE_TILE_HEIGHT: f32 = 256.0;
-const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
+pub const SPRITE_TILE_WIDTH: f32 = 128.0;
+pub const SPRITE_TILE_HEIGHT: f32 = 256.0;
+pub const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
 
 pub const WORKER_RENDER_WIDTH: f32 = 32.0;
 pub const WORKER_RENDER_HEIGHT: f32 = 40.0;
 pub const QUEEN_RENDER_WIDTH: f32 = 48.0;
 pub const QUEEN_RENDER_HEIGHT: f32 = 60.0;
 
-const SPRITE_IDX_STAND: usize = 28;
-const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
-const SPRITE_IDX_JUMP: usize = 35;
-const SPRITE_IDX_FALL: usize = 42;
+pub const SPRITE_IDX_STAND: usize = 28;
+pub const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
+pub const SPRITE_IDX_JUMP: usize = 35;
+pub const SPRITE_IDX_FALL: usize = 42;
 
 const CYCLE_DELAY: Duration = Duration::from_millis(70);
 
@@ -49,7 +47,6 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InputManagerPlugin::<Action>::default())
-            .init_resource::<JoinedPlayers>()
             .init_resource::<QueenDeaths>()
             .add_event::<KnockBackEvent>()
             .add_systems(Startup, setup)
@@ -67,13 +64,10 @@ impl Plugin for PlayerPlugin {
                             apply_movement_animation,
                             apply_idle_sprite.after(movement),
                             apply_jump_sprite,
-                            join,
                         )
                             .after(check_if_players_on_ground),
                     )
-                        .before(disconnect)
                         .before(players_attack),
-                    disconnect,
                     players_attack,
                     (wrap_around_screen, apply_knockbacks).after(players_attack),
                     check_for_queen_death_win,
@@ -82,9 +76,6 @@ impl Plugin for PlayerPlugin {
             );
     }
 }
-
-#[derive(Resource, Default)]
-struct JoinedPlayers(pub HashMap<Gamepad, Entity>);
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
 pub enum Action {
@@ -129,8 +120,8 @@ impl Team {
 #[derive(Component)]
 pub struct Player {
     // This gamepad is used to index each player
-    gamepad: Gamepad,
-    is_on_ground: bool,
+    pub gamepad: Gamepad,
+    pub is_on_ground: bool,
 }
 
 #[derive(Component)]
@@ -174,167 +165,6 @@ fn update_queen_lives_counter(
                 Team::Blue => queen_deaths.blue_deaths,
             }
         )
-    }
-}
-
-fn join(
-    mut commands: Commands,
-    mut joined_players: ResMut<JoinedPlayers>,
-    gamepads: Res<Gamepads>,
-    button_inputs: Res<ButtonInput<GamepadButton>>,
-    mut atlases: ResMut<Assets<TextureAtlasLayout>>,
-    server: Res<AssetServer>,
-) {
-    for gamepad in gamepads.iter() {
-        // Join the game when both bumpers (L+R) on the controller are pressed
-        // We drop down the Bevy's input to get the input from each gamepad
-        if button_inputs.any_just_pressed([
-            GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger),
-            GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
-            GamepadButton::new(gamepad, GamepadButtonType::RightTrigger),
-            GamepadButton::new(gamepad, GamepadButtonType::RightTrigger2),
-        ]) {
-            let join_as_queen = button_inputs.any_just_pressed([
-                GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
-                GamepadButton::new(gamepad, GamepadButtonType::RightTrigger2),
-            ]);
-            let (player_width, player_height) = if join_as_queen {
-                (QUEEN_RENDER_WIDTH, QUEEN_RENDER_HEIGHT)
-            } else {
-                (WORKER_RENDER_WIDTH, WORKER_RENDER_HEIGHT)
-            };
-            let team = if button_inputs.any_just_pressed([
-                GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger),
-                GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger2),
-            ]) {
-                Team::Red
-            } else {
-                Team::Blue
-            };
-            // Make sure a player cannot join twice
-            if !joined_players.0.contains_key(&gamepad) {
-                let texture: Handle<Image> = server.load("spritesheets/spritesheet_players.png");
-                let texture_atlas = TextureAtlasLayout::from_grid(
-                    Vec2::new(SPRITE_TILE_WIDTH, SPRITE_TILE_HEIGHT),
-                    SPRITESHEET_COLS,
-                    SPRITESHEET_ROWS,
-                    None,
-                    None,
-                );
-                let atlas_handle = atlases.add(texture_atlas);
-
-                let mut input_map = InputMap::default();
-                input_map.insert(Action::Jump, GamepadButtonType::South);
-                input_map.insert(
-                    Action::Move,
-                    SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
-                );
-                input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
-                input_map.insert(Action::Disconnect, GamepadButtonType::Select);
-                input_map.set_gamepad(gamepad);
-
-                let mut player = commands.spawn((
-                    SpriteSheetBundle {
-                        texture,
-                        atlas: TextureAtlas {
-                            layout: atlas_handle,
-                            index: SPRITE_IDX_STAND,
-                        },
-                        transform: Transform {
-                            translation: Vec3::new(
-                                match team {
-                                    Team::Red => -WINDOW_WIDTH / 20.0,
-                                    Team::Blue => WINDOW_WIDTH / 20.0,
-                                },
-                                WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
-                                2.0,
-                            ),
-                            ..Default::default()
-                        },
-                        sprite: Sprite {
-                            rect: Some(Rect {
-                                min: Vec2 {
-                                    x: 0.0,
-                                    y: SPRITE_TILE_HEIGHT - SPRITE_TILE_ACTUAL_HEIGHT,
-                                },
-                                max: Vec2 {
-                                    x: SPRITE_TILE_WIDTH,
-                                    y: SPRITE_TILE_HEIGHT,
-                                },
-                            }),
-                            custom_size: Some(Vec2 {
-                                x: player_width,
-                                y: player_height,
-                            }),
-                            color: team.color(),
-                            ..Default::default()
-                        },
-
-                        ..Default::default()
-                    },
-                    Player {
-                        gamepad,
-                        is_on_ground: false,
-                    },
-                    Name::new("Player"),
-                    InputManagerBundle::with_map(input_map),
-                    match team {
-                        Team::Red => Direction::Left,
-                        Team::Blue => Direction::Right,
-                    },
-                    team,
-                    (
-                        RigidBody::Dynamic,
-                        GravityScale(PLAYER_GRAVITY_SCALE),
-                        Collider::cuboid(
-                            player_width / 2.0 * PLAYER_COLLIDER_WIDTH_MULTIPLIER,
-                            player_height / 2.0,
-                        ),
-                        Velocity::default(),
-                        ExternalImpulse::default(),
-                        LockedAxes::ROTATION_LOCKED,
-                        Friction {
-                            coefficient: 0.0,
-                            combine_rule: CoefficientCombineRule::Min,
-                        },
-                        ActiveEvents::all(),
-                        Ccd::enabled(),
-                    ),
-                ));
-                if join_as_queen {
-                    player.insert(Wings);
-                    player.insert(Queen);
-                }
-
-                if join_as_queen {
-                    player.with_children(|children| {
-                        let crown_texture: Handle<Image> = server.load("crown.png");
-                        children.spawn((
-                            SpriteBundle {
-                                sprite: Sprite {
-                                    custom_size: Some(Vec2::splat(player_width * 1.5)),
-                                    ..Default::default()
-                                },
-                                transform: Transform::from_translation(Vec3 {
-                                    x: 0.0,
-                                    y: player_height / 2.0,
-                                    z: 1.0,
-                                }),
-                                texture: crown_texture,
-                                ..Default::default()
-                            },
-                            Crown,
-                        ));
-                    });
-                }
-
-                // Insert the created player and its gamepad to the hashmap of joined players
-                // Since uniqueness was already checked above, we can insert here unchecked
-                joined_players
-                    .0
-                    .insert_unique_unchecked(gamepad, player.id());
-            }
-        }
     }
 }
 
@@ -385,71 +215,6 @@ fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity, &Player)>, time: 
         } else {
             impulse.impulse.x -= velocity.linvel.x * PLAYER_FRICTION_AIR * time.delta_seconds();
         }
-    }
-}
-
-fn disconnect(
-    mut commands: Commands,
-    action_query: Query<(
-        Entity,
-        &ActionState<Action>,
-        &Player,
-        Has<Berry>,
-        &Transform,
-        Option<&RidingOnShip>,
-    )>,
-    mut joined_players: ResMut<JoinedPlayers>,
-    asset_server: Res<AssetServer>,
-) {
-    for (
-        player_entity,
-        action_state,
-        player,
-        killed_has_berry,
-        killed_player_transform,
-        maybe_riding_on_ship,
-    ) in action_query.iter()
-    {
-        if action_state.pressed(&Action::Disconnect) {
-            remove_player(
-                &mut commands,
-                player_entity,
-                &mut joined_players,
-                player,
-                killed_has_berry,
-                killed_player_transform,
-                &asset_server,
-                maybe_riding_on_ship,
-            );
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn remove_player(
-    commands: &mut Commands,
-    player_entity: Entity,
-    joined_players: &mut ResMut<JoinedPlayers>,
-    player: &Player,
-    has_berry: bool,
-    transform: &Transform,
-    asset_server: &Res<AssetServer>,
-    maybe_riding_on_ship: Option<&RidingOnShip>,
-) {
-    // Despawn the disconnected player and remove them from the joined player list
-    commands.entity(player_entity).despawn_recursive();
-    joined_players.0.remove(&player.gamepad);
-
-    if has_berry {
-        commands.spawn(BerryBundle::new(
-            transform.translation.x,
-            transform.translation.y,
-            RigidBody::Dynamic,
-            asset_server,
-        ));
-    }
-    if let Some(riding_on_ship) = maybe_riding_on_ship {
-        commands.entity(riding_on_ship.ship).remove::<Team>();
     }
 }
 
@@ -580,7 +345,6 @@ fn players_attack(
         With<Player>,
     >,
     mut commands: Commands,
-    mut joined_players: ResMut<JoinedPlayers>,
     asset_server: Res<AssetServer>,
     mut ev_knockback: EventWriter<KnockBackEvent>,
     mut queen_deaths: ResMut<QueenDeaths>,
@@ -681,7 +445,7 @@ fn players_attack(
                     let (
                         killed_entity,
                         killed_player_transform,
-                        killed_player,
+                        _,
                         killed_player_team,
                         _,
                         killed_has_berry,
@@ -700,8 +464,6 @@ fn players_attack(
                     remove_player(
                         &mut commands,
                         killed_entity,
-                        &mut joined_players,
-                        killed_player,
                         killed_has_berry,
                         killed_player_transform,
                         &asset_server,
