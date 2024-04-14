@@ -14,7 +14,8 @@ use crate::{
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
-const PLAYER_MAX_VELOCITY_Y: f32 = 400.0;
+const PLAYER_MAX_FALL_SPEED: f32 = 400.0;
+const PLAYER_MAX_RISE_SPEED: f32 = 600.0;
 const PLAYER_FLY_IMPULSE: f32 = 67.5;
 pub const PLAYER_JUMP_IMPULSE: f32 = 45.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
@@ -469,9 +470,16 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), 
     }
 }
 
-fn limit_fall_speed(mut players: Query<&mut Velocity, With<Player>>) {
-    for mut velocity in players.iter_mut() {
-        velocity.linvel.y = velocity.linvel.y.clamp(-PLAYER_MAX_VELOCITY_Y, MAX);
+fn limit_fall_speed(mut players: Query<(&mut Velocity, Has<Wings>), With<Player>>) {
+    for (mut velocity, has_wings) in players.iter_mut() {
+        velocity.linvel.y = velocity.linvel.y.clamp(
+            -PLAYER_MAX_FALL_SPEED,
+            if has_wings {
+                PLAYER_MAX_RISE_SPEED
+            } else {
+                MAX
+            },
+        );
     }
 }
 
@@ -760,7 +768,7 @@ fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Re
     }
 }
 
-fn wrap_around_screen(mut players: Query<&mut Transform, With<Player>>) {
+fn wrap_around_screen(mut players: Query<&mut Transform>) {
     for mut transform in players.iter_mut() {
         if transform.translation.x > WINDOW_RIGHT_X {
             transform.translation.x -= WINDOW_WIDTH;
