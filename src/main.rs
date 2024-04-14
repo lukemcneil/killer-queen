@@ -3,6 +3,7 @@
 mod animation;
 mod berries;
 mod gates;
+mod join;
 mod platforms;
 mod player;
 mod ship;
@@ -14,6 +15,7 @@ use bevy::{prelude::*, window::WindowResolution};
 use bevy_rapier2d::prelude::*;
 use gates::GatePlugin;
 use iyes_perf_ui::{diagnostics::PerfUiEntryFPS, PerfUiPlugin, PerfUiRoot};
+use join::JoinPlugin;
 use platforms::PlatformsPlugin;
 use player::{PlayerPlugin, Team};
 use ship::ShipPlugin;
@@ -31,6 +33,7 @@ const COLOR_BACKGROUND: Color = Color::rgb(0.5, 0.5, 0.5);
 fn main() {
     App::new()
         .insert_resource(ClearColor(COLOR_BACKGROUND))
+        .init_state::<GameState>()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Bevy Platformer".to_string(),
@@ -49,6 +52,7 @@ fn main() {
             BerriesPlugin,
             ShipPlugin,
             GatePlugin,
+            JoinPlugin,
         ))
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(PerfUiPlugin)
@@ -57,6 +61,13 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Update, set_win_text)
         .run();
+}
+
+#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
+enum GameState {
+    #[default]
+    Join,
+    Play,
 }
 
 fn setup(mut commands: Commands) {

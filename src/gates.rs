@@ -14,7 +14,7 @@ use crate::{
 pub struct GatePlugin;
 
 const GATE_WIDTH: f32 = WORKER_RENDER_WIDTH * 1.5;
-const GATE_HEIGHT: f32 = WORKER_RENDER_HEIGHT * 1.5;
+pub const GATE_HEIGHT: f32 = WORKER_RENDER_HEIGHT * 1.5;
 const GATE_TIME: f32 = 1.0;
 
 impl Plugin for GatePlugin {
@@ -28,7 +28,7 @@ impl Plugin for GatePlugin {
 pub struct Gate;
 
 #[derive(Bundle)]
-struct GateBundle {
+pub struct GateBundle {
     gate: Gate,
     sprite_bundle: SpriteBundle,
     collider: Collider,
@@ -36,7 +36,7 @@ struct GateBundle {
 }
 
 impl GateBundle {
-    fn new(x: f32, y: f32, asset_server: &Res<AssetServer>) -> Self {
+    pub fn new(x: f32, y: f32, asset_server: &Res<AssetServer>) -> Self {
         let texture = asset_server.load("gate.png");
         Self {
             gate: Gate,
