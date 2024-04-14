@@ -229,6 +229,7 @@ fn join(
                     Action::Move,
                     SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
                 );
+                input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
                 input_map.insert(Action::Disconnect, GamepadButtonType::Select);
                 input_map.set_gamepad(gamepad);
 
