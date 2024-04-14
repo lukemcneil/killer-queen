@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
-use crate::{WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH};
+use crate::{WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH};
 
 const COLOR_PLATFORM: Color = Color::rgb(0.29, 0.31, 0.41);
 pub const PLATFORM_HEIGHT: f32 = 20.0;
@@ -45,6 +45,8 @@ impl Plugin for PlatformsPlugin {
 fn setup(mut commands: Commands) {
     for sign in [1.0, -1.0] {
         for (x, y, width) in [
+            // layer 0
+            (0.0, WINDOW_BOTTOM_Y, WINDOW_WIDTH),
             // layer 1
             (
                 (WINDOW_RIGHT_X - WINDOW_WIDTH / 24.0),
@@ -133,6 +135,8 @@ fn setup(mut commands: Commands) {
                 WINDOW_BOTTOM_Y + 8.0 * WINDOW_HEIGHT / 9.0,
                 WINDOW_WIDTH / 30.0,
             ),
+            // layer 9 (top)
+            (0.0, WINDOW_TOP_Y, WINDOW_WIDTH),
         ] {
             commands.spawn(PlatformBundle::new(
                 x * sign,
@@ -167,4 +171,11 @@ fn setup(mut commands: Commands) {
         WINDOW_BOTTOM_Y + 8.0 * WINDOW_HEIGHT / 9.0,
         Vec3::new(PLATFORM_HEIGHT, 2.0 * WINDOW_HEIGHT / 9.0, 1.0),
     ));
+    for sign in [-1.0, 1.0] {
+        commands.spawn(PlatformBundle::new(
+            WINDOW_RIGHT_X * sign,
+            WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0,
+            Vec3::new(PLATFORM_HEIGHT, 4.0 * WINDOW_HEIGHT / 9.0, 1.0),
+        ));
+    }
 }

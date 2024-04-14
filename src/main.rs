@@ -26,10 +26,7 @@ pub const WINDOW_LEFT_X: f32 = WINDOW_WIDTH / -2.0;
 pub const WINDOW_TOP_Y: f32 = WINDOW_HEIGHT / 2.0;
 pub const WINDOW_RIGHT_X: f32 = WINDOW_WIDTH / 2.0;
 
-const FLOOR_THICKNESS: f32 = 10.0;
-
 const COLOR_BACKGROUND: Color = Color::rgb(0.5, 0.5, 0.5);
-const COLOR_FLOOR: Color = Color::rgb(0.45, 0.55, 0.66);
 
 fn main() {
     App::new()
@@ -72,48 +69,6 @@ fn setup(mut commands: Commands) {
         PerfUiEntryFPS::default(),
     ));
     commands.spawn(Camera2dBundle::default());
-
-    for y in [
-        WINDOW_BOTTOM_Y + FLOOR_THICKNESS / 2.0,
-        -(WINDOW_BOTTOM_Y + FLOOR_THICKNESS / 2.0),
-    ] {
-        commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
-                    color: COLOR_FLOOR,
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(0.0, y, 0.0),
-                    scale: Vec3::new(WINDOW_WIDTH, FLOOR_THICKNESS, 1.0),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(RigidBody::Fixed)
-            .insert(Collider::cuboid(0.5, 0.5));
-    }
-
-    for x in [
-        WINDOW_LEFT_X + FLOOR_THICKNESS / 2.0,
-        -(WINDOW_LEFT_X + FLOOR_THICKNESS / 2.0),
-    ] {
-        commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
-                    color: COLOR_FLOOR,
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(x, 0.0, 0.0),
-                    scale: Vec3::new(FLOOR_THICKNESS, WINDOW_HEIGHT, 1.0),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(RigidBody::Fixed)
-            .insert(Collider::cuboid(0.5, 0.5));
-    }
 }
 
 #[derive(Debug, Clone, Copy)]

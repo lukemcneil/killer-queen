@@ -8,7 +8,8 @@ use crate::{
     animation::Animation,
     berries::{Berry, BerryBundle},
     ship::RidingOnShip,
-    WinCondition, WinEvent, WINDOW_HEIGHT, WINDOW_TOP_Y, WINDOW_WIDTH,
+    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X,
+    WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
@@ -66,6 +67,7 @@ impl Plugin for PlayerPlugin {
                             apply_idle_sprite.after(movement),
                             apply_jump_sprite,
                             join,
+                            wrap_around_screen,
                         )
                             .after(check_if_players_on_ground),
                     )
@@ -753,5 +755,22 @@ fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Re
             team: Team::Red,
             win_condition,
         });
+    }
+}
+
+fn wrap_around_screen(mut players: Query<&mut Transform, With<Player>>) {
+    for mut transform in players.iter_mut() {
+        if transform.translation.x > WINDOW_RIGHT_X {
+            transform.translation.x -= WINDOW_WIDTH;
+        }
+        if transform.translation.x < WINDOW_LEFT_X {
+            transform.translation.x += WINDOW_WIDTH;
+        }
+        if transform.translation.y > WINDOW_TOP_Y {
+            transform.translation.y -= WINDOW_HEIGHT;
+        }
+        if transform.translation.y < WINDOW_BOTTOM_Y {
+            transform.translation.y += WINDOW_HEIGHT;
+        }
     }
 }
