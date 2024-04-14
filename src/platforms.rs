@@ -106,12 +106,12 @@ fn setup(mut commands: Commands) {
             (
                 (WINDOW_RIGHT_X - WINDOW_WIDTH / 8.0),
                 WINDOW_BOTTOM_Y + 6.0 * WINDOW_HEIGHT / 9.0,
-                WINDOW_WIDTH / 30.0,
+                WINDOW_WIDTH / 25.0,
             ),
             (
-                (WINDOW_RIGHT_X - WINDOW_WIDTH / 3.0),
+                (WINDOW_RIGHT_X - WINDOW_WIDTH / 3.2),
                 WINDOW_BOTTOM_Y + 6.0 * WINDOW_HEIGHT / 9.0,
-                WINDOW_WIDTH / 30.0,
+                WINDOW_WIDTH / 25.0,
             ),
             // layer 7
             (
@@ -131,9 +131,9 @@ fn setup(mut commands: Commands) {
             ),
             // layer 8
             (
-                (WINDOW_RIGHT_X - WINDOW_WIDTH / 3.0),
+                (WINDOW_RIGHT_X - WINDOW_WIDTH / 3.2),
                 WINDOW_BOTTOM_Y + 8.0 * WINDOW_HEIGHT / 9.0,
-                WINDOW_WIDTH / 30.0,
+                WINDOW_WIDTH / 25.0,
             ),
             // layer 9 (top)
             (0.0, WINDOW_TOP_Y, WINDOW_WIDTH),
