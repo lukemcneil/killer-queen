@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{f32::MAX, time::Duration};
 
 use bevy::{prelude::*, utils::HashMap};
 use bevy_rapier2d::prelude::*;
@@ -14,7 +14,7 @@ use crate::{
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
-const PLAYER_MAX_VELOCITY_Y: f32 = 600.0;
+const PLAYER_MAX_VELOCITY_Y: f32 = 400.0;
 const PLAYER_FLY_IMPULSE: f32 = 67.5;
 pub const PLAYER_JUMP_IMPULSE: f32 = 45.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
@@ -60,8 +60,8 @@ impl Plugin for PlayerPlugin {
                         (
                             movement,
                             friction,
-                            fly,
-                            jump,
+                            (fly, jump).before(limit_fall_speed),
+                            limit_fall_speed,
                             update_sprite_direction,
                             apply_movement_animation,
                             apply_idle_sprite.after(movement),
@@ -453,16 +453,11 @@ fn remove_player(
     }
 }
 
-fn fly(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &mut Velocity), With<Wings>>) {
-    for (action_state, mut impulse, mut velocity) in query.iter_mut() {
+fn fly(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse), With<Wings>>) {
+    for (action_state, mut impulse) in query.iter_mut() {
         if action_state.just_pressed(&Action::Jump) {
             impulse.impulse.y += PLAYER_FLY_IMPULSE;
         }
-
-        velocity.linvel.y = velocity
-            .linvel
-            .y
-            .clamp(-PLAYER_MAX_VELOCITY_Y, PLAYER_MAX_VELOCITY_Y);
     }
 }
 
@@ -471,6 +466,12 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), 
         if action_state.just_pressed(&Action::Jump) && player.is_on_ground {
             impulse.impulse.y += PLAYER_JUMP_IMPULSE;
         }
+    }
+}
+
+fn limit_fall_speed(mut players: Query<&mut Velocity, With<Player>>) {
+    for mut velocity in players.iter_mut() {
+        velocity.linvel.y = velocity.linvel.y.clamp(-PLAYER_MAX_VELOCITY_Y, MAX);
     }
 }
 
