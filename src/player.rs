@@ -68,7 +68,6 @@ impl Plugin for PlayerPlugin {
                             apply_idle_sprite.after(movement),
                             apply_jump_sprite,
                             join,
-                            wrap_around_screen,
                         )
                             .after(check_if_players_on_ground),
                     )
@@ -76,7 +75,7 @@ impl Plugin for PlayerPlugin {
                         .before(players_attack),
                     disconnect,
                     players_attack,
-                    apply_knockbacks.after(players_attack),
+                    (wrap_around_screen, apply_knockbacks).after(players_attack),
                     check_for_queen_death_win,
                     update_queen_lives_counter,
                 ),
@@ -94,7 +93,7 @@ pub enum Action {
     Disconnect,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub enum Direction {
     Right,
     Left,
