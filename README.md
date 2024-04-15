@@ -1,6 +1,8 @@
 # Killer Queen
 
-This is a clone of the killer queen arcade game.
+This is a clone of the killer queen arcade game. Play either by
+1. Cloning locally and running `cargo run --features bevy/dynamic_linking --release`
+2. Go to https://lukemcneil.github.io/killer-queen/ (compiled to WebAssembly)
 
 ## How to Play
 
