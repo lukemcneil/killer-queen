@@ -1,29 +1,14 @@
 use bevy::{prelude::*, utils::HashMap};
-use bevy_rapier2d::{
-    dynamics::{
-        Ccd, CoefficientCombineRule, ExternalImpulse, GravityScale, LockedAxes, RigidBody, Velocity,
-    },
-    geometry::{ActiveEvents, Collider, Friction},
-};
-use leafwing_input_manager::{
-    action_state::ActionState,
-    axislike::{SingleAxis, VirtualAxis},
-    input_map::InputMap,
-    InputManagerBundle,
-};
+use bevy_rapier2d::dynamics::RigidBody;
+use leafwing_input_manager::action_state::ActionState;
 
 use crate::{
     berries::{Berry, BerryBundle},
     gates::{GateBundle, GATE_HEIGHT},
     platforms::{PlatformBundle, PLATFORM_HEIGHT},
-    player::{
-        Action, Crown, Direction, Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER,
-        PLAYER_GRAVITY_SCALE, QUEEN_RENDER_HEIGHT, QUEEN_RENDER_WIDTH, SPRITESHEET_COLS,
-        SPRITESHEET_ROWS, SPRITE_IDX_STAND, SPRITE_TILE_ACTUAL_HEIGHT, SPRITE_TILE_HEIGHT,
-        SPRITE_TILE_WIDTH, WORKER_RENDER_HEIGHT, WORKER_RENDER_WIDTH,
-    },
+    player::{Action, Player, Queen, SpawnPlayerEvent, Team},
     ship::RidingOnShip,
-    GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH,
+    GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
 };
 
 const TEMP_PLATFORM_COLOR: Color = Color::BLACK;
@@ -37,7 +22,10 @@ impl Plugin for JoinPlugin {
         app.init_resource::<JoinedPlayers>()
             .add_systems(
                 Update,
-                (check_for_start_game, join, disconnect).run_if(in_state(GameState::Join)),
+                (
+                    (check_for_start_game, disconnect).run_if(in_state(GameState::Join)),
+                    join,
+                ),
             )
             .add_systems(OnEnter(GameState::Join), setup_join)
             .add_systems(OnExit(GameState::Join), delete_temp_platforms);
@@ -96,13 +84,11 @@ fn delete_temp_platforms(
 }
 
 fn join(
-    mut commands: Commands,
-    mut joined_players: ResMut<JoinedPlayers>,
+    joined_players: ResMut<JoinedPlayers>,
     gamepads: Res<Gamepads>,
     button_inputs: Res<ButtonInput<GamepadButton>>,
-    mut atlases: ResMut<Assets<TextureAtlasLayout>>,
-    server: Res<AssetServer>,
     queens: Query<&Team, With<Queen>>,
+    mut ev_spawn_players: EventWriter<SpawnPlayerEvent>,
 ) {
     for gamepad in gamepads.iter() {
         // Join the game when both bumpers (L+R) on the controller are pressed
@@ -118,135 +104,15 @@ fn join(
             } else {
                 Team::Blue
             };
-            let join_as_queen = !queens.iter().any(|&queen_team| queen_team == team);
-            let (player_width, player_height) = if join_as_queen {
-                (QUEEN_RENDER_WIDTH, QUEEN_RENDER_HEIGHT)
-            } else {
-                (WORKER_RENDER_WIDTH, WORKER_RENDER_HEIGHT)
-            };
+            let is_queen = !queens.iter().any(|&queen_team| queen_team == team);
 
             // Make sure a player cannot join twice
             if !joined_players.0.contains_key(&gamepad) {
-                let texture: Handle<Image> = server.load("spritesheets/spritesheet_players.png");
-                let texture_atlas = TextureAtlasLayout::from_grid(
-                    Vec2::new(SPRITE_TILE_WIDTH, SPRITE_TILE_HEIGHT),
-                    SPRITESHEET_COLS,
-                    SPRITESHEET_ROWS,
-                    None,
-                    None,
-                );
-                let atlas_handle = atlases.add(texture_atlas);
-
-                let mut input_map = InputMap::default();
-                input_map.insert(Action::Jump, GamepadButtonType::South);
-                input_map.insert(
-                    Action::Move,
-                    SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
-                );
-                input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
-                input_map.insert(Action::Disconnect, GamepadButtonType::Select);
-                input_map.set_gamepad(gamepad);
-
-                let mut player = commands.spawn((
-                    SpriteSheetBundle {
-                        texture,
-                        atlas: TextureAtlas {
-                            layout: atlas_handle,
-                            index: SPRITE_IDX_STAND,
-                        },
-                        transform: Transform {
-                            translation: Vec3::new(
-                                match team {
-                                    Team::Red => -WINDOW_WIDTH / 20.0,
-                                    Team::Blue => WINDOW_WIDTH / 20.0,
-                                },
-                                WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
-                                2.0,
-                            ),
-                            ..Default::default()
-                        },
-                        sprite: Sprite {
-                            rect: Some(Rect {
-                                min: Vec2 {
-                                    x: 0.0,
-                                    y: SPRITE_TILE_HEIGHT - SPRITE_TILE_ACTUAL_HEIGHT,
-                                },
-                                max: Vec2 {
-                                    x: SPRITE_TILE_WIDTH,
-                                    y: SPRITE_TILE_HEIGHT,
-                                },
-                            }),
-                            custom_size: Some(Vec2 {
-                                x: player_width,
-                                y: player_height,
-                            }),
-                            color: team.color(),
-                            ..Default::default()
-                        },
-
-                        ..Default::default()
-                    },
-                    Player {
-                        gamepad,
-                        is_on_ground: false,
-                    },
-                    Name::new("Player"),
-                    InputManagerBundle::with_map(input_map),
-                    match team {
-                        Team::Red => Direction::Left,
-                        Team::Blue => Direction::Right,
-                    },
+                ev_spawn_players.send(SpawnPlayerEvent {
                     team,
-                    (
-                        RigidBody::Dynamic,
-                        GravityScale(PLAYER_GRAVITY_SCALE),
-                        Collider::cuboid(
-                            player_width / 2.0 * PLAYER_COLLIDER_WIDTH_MULTIPLIER,
-                            player_height / 2.0,
-                        ),
-                        Velocity::default(),
-                        ExternalImpulse::default(),
-                        LockedAxes::ROTATION_LOCKED,
-                        Friction {
-                            coefficient: 0.0,
-                            combine_rule: CoefficientCombineRule::Min,
-                        },
-                        ActiveEvents::all(),
-                        Ccd::enabled(),
-                    ),
-                ));
-                if join_as_queen {
-                    player.insert(Wings);
-                    player.insert(Queen);
-                }
-
-                if join_as_queen {
-                    player.with_children(|children| {
-                        let crown_texture: Handle<Image> = server.load("crown.png");
-                        children.spawn((
-                            SpriteBundle {
-                                sprite: Sprite {
-                                    custom_size: Some(Vec2::splat(player_width * 1.5)),
-                                    ..Default::default()
-                                },
-                                transform: Transform::from_translation(Vec3 {
-                                    x: 0.0,
-                                    y: player_height / 2.0,
-                                    z: 1.0,
-                                }),
-                                texture: crown_texture,
-                                ..Default::default()
-                            },
-                            Crown,
-                        ));
-                    });
-                }
-
-                // Insert the created player and its gamepad to the hashmap of joined players
-                // Since uniqueness was already checked above, we can insert here unchecked
-                joined_players
-                    .0
-                    .insert_unique_unchecked(gamepad, player.id());
+                    is_queen,
+                    gamepad,
+                });
             }
         }
     }

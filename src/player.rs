@@ -5,9 +5,12 @@ use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::{
-    animation::Animation, berries::Berry, join::remove_player, ship::RidingOnShip, WinCondition,
-    WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X, WINDOW_TOP_Y,
-    WINDOW_WIDTH,
+    animation::Animation,
+    berries::Berry,
+    join::{remove_player, JoinedPlayers},
+    ship::RidingOnShip,
+    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X,
+    WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
@@ -20,25 +23,25 @@ const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 115.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.3;
-pub const PLAYER_GRAVITY_SCALE: f32 = 15.0;
+const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.5;
 
-pub const SPRITESHEET_COLS: usize = 7;
-pub const SPRITESHEET_ROWS: usize = 8;
+const SPRITESHEET_COLS: usize = 7;
+const SPRITESHEET_ROWS: usize = 8;
 
-pub const SPRITE_TILE_WIDTH: f32 = 128.0;
-pub const SPRITE_TILE_HEIGHT: f32 = 256.0;
-pub const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
+const SPRITE_TILE_WIDTH: f32 = 128.0;
+const SPRITE_TILE_HEIGHT: f32 = 256.0;
+const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
 
 pub const WORKER_RENDER_WIDTH: f32 = 32.0;
 pub const WORKER_RENDER_HEIGHT: f32 = 40.0;
 pub const QUEEN_RENDER_WIDTH: f32 = 48.0;
 pub const QUEEN_RENDER_HEIGHT: f32 = 60.0;
 
-pub const SPRITE_IDX_STAND: usize = 28;
-pub const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
-pub const SPRITE_IDX_JUMP: usize = 35;
-pub const SPRITE_IDX_FALL: usize = 42;
+const SPRITE_IDX_STAND: usize = 28;
+const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
+const SPRITE_IDX_JUMP: usize = 35;
+const SPRITE_IDX_FALL: usize = 42;
 
 const CYCLE_DELAY: Duration = Duration::from_millis(70);
 
@@ -49,6 +52,7 @@ impl Plugin for PlayerPlugin {
         app.add_plugins(InputManagerPlugin::<Action>::default())
             .init_resource::<QueenDeaths>()
             .add_event::<KnockBackEvent>()
+            .add_event::<SpawnPlayerEvent>()
             .add_systems(Startup, setup)
             .add_systems(
                 Update,
@@ -72,6 +76,7 @@ impl Plugin for PlayerPlugin {
                     (wrap_around_screen, apply_knockbacks).after(players_attack),
                     check_for_queen_death_win,
                     update_queen_lives_counter,
+                    spawn_players,
                 ),
             );
     }
@@ -327,6 +332,13 @@ pub struct KnockBackEvent {
     pub direction: Direction,
 }
 
+#[derive(Event, Debug)]
+pub struct SpawnPlayerEvent {
+    pub team: Team,
+    pub is_queen: bool,
+    pub gamepad: Gamepad,
+}
+
 fn players_attack(
     mut collision_events: EventReader<CollisionEvent>,
     players: Query<
@@ -348,6 +360,7 @@ fn players_attack(
     asset_server: Res<AssetServer>,
     mut ev_knockback: EventWriter<KnockBackEvent>,
     mut queen_deaths: ResMut<QueenDeaths>,
+    mut ev_spawn_players: EventWriter<SpawnPlayerEvent>,
 ) {
     for collision_event in collision_events.read() {
         if let CollisionEvent::Started(entity1, entity2, _flags) = collision_event {
@@ -445,8 +458,8 @@ fn players_attack(
                     let (
                         killed_entity,
                         killed_player_transform,
-                        _,
-                        killed_player_team,
+                        killed_player,
+                        &killed_player_team,
                         _,
                         killed_has_berry,
                         _,
@@ -469,7 +482,12 @@ fn players_attack(
                         &asset_server,
                         maybe_riding_on_ship,
                     );
-                };
+                    ev_spawn_players.send(SpawnPlayerEvent {
+                        team: killed_player_team,
+                        is_queen: killed_player_is_queen,
+                        gamepad: killed_player.gamepad,
+                    });
+                }
             }
         }
     }
@@ -543,5 +561,140 @@ fn wrap_around_screen(mut players: Query<&mut Transform>) {
         if transform.translation.y < WINDOW_BOTTOM_Y {
             transform.translation.y += WINDOW_HEIGHT;
         }
+    }
+}
+
+fn spawn_players(
+    mut ev_spawn_players: EventReader<SpawnPlayerEvent>,
+    server: Res<AssetServer>,
+    mut atlases: ResMut<Assets<TextureAtlasLayout>>,
+    mut commands: Commands,
+    mut joined_players: ResMut<JoinedPlayers>,
+) {
+    for ev in ev_spawn_players.read() {
+        let texture: Handle<Image> = server.load("spritesheets/spritesheet_players.png");
+        let texture_atlas = TextureAtlasLayout::from_grid(
+            Vec2::new(SPRITE_TILE_WIDTH, SPRITE_TILE_HEIGHT),
+            SPRITESHEET_COLS,
+            SPRITESHEET_ROWS,
+            None,
+            None,
+        );
+        let atlas_handle = atlases.add(texture_atlas);
+
+        let mut input_map = InputMap::default();
+        input_map.insert(Action::Jump, GamepadButtonType::South);
+        input_map.insert(
+            Action::Move,
+            SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
+        );
+        input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
+        input_map.insert(Action::Disconnect, GamepadButtonType::Select);
+        input_map.set_gamepad(ev.gamepad);
+
+        let (player_width, player_height) = if ev.is_queen {
+            (QUEEN_RENDER_WIDTH, QUEEN_RENDER_HEIGHT)
+        } else {
+            (WORKER_RENDER_WIDTH, WORKER_RENDER_HEIGHT)
+        };
+
+        let mut player = commands.spawn((
+            SpriteSheetBundle {
+                texture,
+                atlas: TextureAtlas {
+                    layout: atlas_handle,
+                    index: SPRITE_IDX_STAND,
+                },
+                transform: Transform {
+                    translation: Vec3::new(
+                        match ev.team {
+                            Team::Red => -WINDOW_WIDTH / 20.0,
+                            Team::Blue => WINDOW_WIDTH / 20.0,
+                        },
+                        WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
+                        2.0,
+                    ),
+                    ..Default::default()
+                },
+                sprite: Sprite {
+                    rect: Some(Rect {
+                        min: Vec2 {
+                            x: 0.0,
+                            y: SPRITE_TILE_HEIGHT - SPRITE_TILE_ACTUAL_HEIGHT,
+                        },
+                        max: Vec2 {
+                            x: SPRITE_TILE_WIDTH,
+                            y: SPRITE_TILE_HEIGHT,
+                        },
+                    }),
+                    custom_size: Some(Vec2 {
+                        x: player_width,
+                        y: player_height,
+                    }),
+                    color: ev.team.color(),
+                    ..Default::default()
+                },
+
+                ..Default::default()
+            },
+            Player {
+                gamepad: ev.gamepad,
+                is_on_ground: false,
+            },
+            Name::new("Player"),
+            InputManagerBundle::with_map(input_map),
+            match ev.team {
+                Team::Red => Direction::Left,
+                Team::Blue => Direction::Right,
+            },
+            ev.team,
+            (
+                RigidBody::Dynamic,
+                GravityScale(PLAYER_GRAVITY_SCALE),
+                Collider::cuboid(
+                    player_width / 2.0 * PLAYER_COLLIDER_WIDTH_MULTIPLIER,
+                    player_height / 2.0,
+                ),
+                Velocity::default(),
+                ExternalImpulse::default(),
+                LockedAxes::ROTATION_LOCKED,
+                Friction {
+                    coefficient: 0.0,
+                    combine_rule: CoefficientCombineRule::Min,
+                },
+                ActiveEvents::all(),
+                Ccd::enabled(),
+            ),
+        ));
+        if ev.is_queen {
+            player.insert(Wings);
+            player.insert(Queen);
+
+            player.with_children(|children| {
+                let crown_texture: Handle<Image> = server.load("crown.png");
+                children.spawn((
+                    SpriteBundle {
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::splat(player_width * 1.5)),
+                            ..Default::default()
+                        },
+                        transform: Transform::from_translation(Vec3 {
+                            x: 0.0,
+                            y: player_height / 2.0,
+                            z: 1.0,
+                        }),
+                        texture: crown_texture,
+                        ..Default::default()
+                    },
+                    Crown,
+                ));
+            });
+        }
+
+        // Insert the created player and its gamepad to the hashmap of joined players
+        // Since uniqueness was already checked above, we can insert here unchecked
+        joined_players
+            .0
+            .insert_unique_unchecked(ev.gamepad, player.id());
     }
 }
