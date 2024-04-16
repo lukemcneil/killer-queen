@@ -1,23 +1,34 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
+use bevy_rapier2d::dynamics::RigidBody;
+use leafwing_input_manager::action_state::ActionState;
 
 use crate::{
+    berries::{Berry, BerryBundle},
     gates::{GateBundle, GATE_HEIGHT},
     platforms::{PlatformBundle, PLATFORM_HEIGHT},
-    player::Team,
+    player::{Action, Player, Queen, SpawnPlayerEvent, Team},
+    ship::RidingOnShip,
     GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
 };
 
 const TEMP_PLATFORM_COLOR: Color = Color::BLACK;
 pub struct JoinPlugin;
 
+#[derive(Resource, Default)]
+pub struct JoinedPlayers(pub HashMap<Gamepad, Entity>);
+
 impl Plugin for JoinPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            check_for_start_game.run_if(in_state(GameState::Join)),
-        )
-        .add_systems(OnEnter(GameState::Join), setup_join)
-        .add_systems(OnExit(GameState::Join), delete_temp_platforms);
+        app.init_resource::<JoinedPlayers>()
+            .add_systems(
+                Update,
+                (
+                    (check_for_start_game, disconnect).run_if(in_state(GameState::Join)),
+                    join,
+                ),
+            )
+            .add_systems(OnEnter(GameState::Join), setup_join)
+            .add_systems(OnExit(GameState::Join), delete_temp_platforms);
     }
 }
 
@@ -69,5 +80,116 @@ fn delete_temp_platforms(
     }
     for join_gate in join_gates.iter() {
         commands.entity(join_gate).despawn();
+    }
+}
+
+fn join(
+    joined_players: ResMut<JoinedPlayers>,
+    gamepads: Res<Gamepads>,
+    button_inputs: Res<ButtonInput<GamepadButton>>,
+    queens: Query<&Team, With<Queen>>,
+    mut ev_spawn_players: EventWriter<SpawnPlayerEvent>,
+) {
+    for gamepad in gamepads.iter() {
+        // Join the game when both bumpers (L+R) on the controller are pressed
+        // We drop down the Bevy's input to get the input from each gamepad
+        if button_inputs.any_just_pressed([
+            GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger),
+            GamepadButton::new(gamepad, GamepadButtonType::RightTrigger),
+        ]) {
+            let team = if button_inputs
+                .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
+            {
+                Team::Red
+            } else {
+                Team::Blue
+            };
+            let is_queen = !queens.iter().any(|&queen_team| queen_team == team);
+
+            // Make sure a player cannot join twice
+            if !joined_players.0.contains_key(&gamepad) {
+                ev_spawn_players.send(SpawnPlayerEvent {
+                    team,
+                    is_queen,
+                    gamepad,
+                    delay: 0.0,
+                    start_invincible: false,
+                });
+            }
+        }
+    }
+}
+
+fn disconnect(
+    mut commands: Commands,
+    action_query: Query<(
+        Entity,
+        &ActionState<Action>,
+        &Player,
+        Has<Berry>,
+        &Transform,
+        Option<&RidingOnShip>,
+        &Team,
+        Has<Queen>,
+    )>,
+    mut joined_players: ResMut<JoinedPlayers>,
+    asset_server: Res<AssetServer>,
+    mut join_gates: Query<(Entity, &Team, &mut Sprite), With<JoinGate>>,
+) {
+    for (
+        player_entity,
+        action_state,
+        player,
+        killed_has_berry,
+        killed_player_transform,
+        maybe_riding_on_ship,
+        team,
+        is_queen,
+    ) in action_query.iter()
+    {
+        if action_state.pressed(&Action::Disconnect) {
+            joined_players.0.remove(&player.gamepad);
+            remove_player(
+                &mut commands,
+                player_entity,
+                killed_has_berry,
+                killed_player_transform,
+                &asset_server,
+                maybe_riding_on_ship,
+            );
+            if is_queen {
+                for (join_gate, join_gate_team, mut gate_sprite) in join_gates.iter_mut() {
+                    if join_gate_team == team {
+                        commands.entity(join_gate).remove::<Team>();
+                        gate_sprite.color = Color::WHITE;
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn remove_player(
+    commands: &mut Commands,
+    player_entity: Entity,
+    has_berry: bool,
+    transform: &Transform,
+    asset_server: &Res<AssetServer>,
+    maybe_riding_on_ship: Option<&RidingOnShip>,
+) {
+    // Despawn the disconnected player and remove them from the joined player list
+    commands.entity(player_entity).despawn_recursive();
+
+    if has_berry {
+        commands.spawn(BerryBundle::new(
+            transform.translation.x,
+            transform.translation.y,
+            RigidBody::Dynamic,
+            asset_server,
+        ));
+    }
+    if let Some(riding_on_ship) = maybe_riding_on_ship {
+        commands.entity(riding_on_ship.ship).remove::<Team>();
     }
 }
