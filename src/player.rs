@@ -26,6 +26,7 @@ const PLAYER_FRICTION_AIR: f32 = 0.3;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.5;
 const RESPAWN_DELAY: f32 = 2.0;
+const INVINCIBILITY_DURATION: f32 = 2.0;
 
 const SPRITESHEET_COLS: usize = 7;
 const SPRITESHEET_ROWS: usize = 8;
@@ -79,6 +80,7 @@ impl Plugin for PlayerPlugin {
                     update_queen_lives_counter,
                     add_delayed_player_spawners,
                     spawn_players,
+                    handle_invincibility,
                 ),
             );
     }
@@ -108,6 +110,12 @@ pub struct Crown;
 
 #[derive(Component)]
 pub struct Queen;
+
+#[derive(Component)]
+struct Invincible {
+    timer: Timer,
+    animation_timer: Timer,
+}
 
 #[derive(Default, Resource)]
 pub struct QueenDeaths {
@@ -340,6 +348,7 @@ pub struct SpawnPlayerEvent {
     pub is_queen: bool,
     pub gamepad: Gamepad,
     pub delay: f32,
+    pub start_invincible: bool,
 }
 
 fn players_attack(
@@ -356,6 +365,7 @@ fn players_attack(
             &Sprite,
             Option<&RidingOnShip>,
             Has<Queen>,
+            Has<Invincible>,
         ),
         With<Player>,
     >,
@@ -469,8 +479,11 @@ fn players_attack(
                         _,
                         maybe_riding_on_ship,
                         killed_player_is_queen,
+                        killed_player_invincible,
                     ) = killed_player_components;
-
+                    if killed_player_invincible {
+                        continue;
+                    }
                     if killed_player_is_queen {
                         match killed_player_team {
                             Team::Red => queen_deaths.red_deaths += 1,
@@ -490,6 +503,7 @@ fn players_attack(
                         is_queen: killed_player_is_queen,
                         gamepad: killed_player.gamepad,
                         delay: RESPAWN_DELAY,
+                        start_invincible: true,
                     });
                 }
             }
@@ -718,12 +732,43 @@ fn spawn_players(
                     ));
                 });
             }
+            if ev.start_invincible {
+                player.insert(Invincible {
+                    timer: Timer::from_seconds(INVINCIBILITY_DURATION, TimerMode::Once),
+                    animation_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                });
+            }
 
             // Insert the created player and its gamepad to the hashmap of joined players
             // Since uniqueness was already checked above, we can insert here unchecked
             joined_players
                 .0
                 .insert_unique_unchecked(ev.gamepad, player.id());
+        }
+    }
+}
+
+fn handle_invincibility(
+    mut invincible_players: Query<(Entity, &mut Invincible, &Visibility)>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (player_entity, mut invincible, visibility) in &mut invincible_players {
+        invincible.timer.tick(time.delta());
+        invincible.animation_timer.tick(time.delta());
+
+        if invincible.animation_timer.finished() {
+            commands.entity(player_entity).insert(match visibility {
+                Visibility::Visible | Visibility::Inherited => Visibility::Hidden,
+                Visibility::Hidden => Visibility::Visible,
+            });
+        }
+
+        if invincible.timer.finished() {
+            commands
+                .entity(player_entity)
+                .insert(Visibility::Visible)
+                .remove::<Invincible>();
         }
     }
 }

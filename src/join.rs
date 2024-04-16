@@ -113,6 +113,7 @@ fn join(
                     is_queen,
                     gamepad,
                     delay: 0.0,
+                    start_invincible: false,
                 });
             }
         }
