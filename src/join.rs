@@ -112,6 +112,7 @@ fn join(
                     team,
                     is_queen,
                     gamepad,
+                    delay: 0.0,
                 });
             }
         }
