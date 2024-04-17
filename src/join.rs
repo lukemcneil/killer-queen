@@ -48,17 +48,39 @@ pub struct TempPlatform;
 pub struct JoinGate;
 
 fn setup_join(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        PlatformBundle::new(
-            0.0,
-            WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0 + PLATFORM_HEIGHT,
-            Vec3::new(WINDOW_WIDTH, PLATFORM_HEIGHT, 1.0),
-            Some(TEMP_PLATFORM_COLOR),
-        ),
-        TempPlatform,
-    ));
-
     for sign in [-1.0, 1.0] {
+        commands.spawn((
+            PlatformBundle::new(
+                sign * (WINDOW_RIGHT_X - WINDOW_WIDTH / 40.0 - WINDOW_WIDTH / 10.0
+                    + WINDOW_WIDTH / 60.0),
+                WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0,
+                Vec3::new(
+                    (WINDOW_RIGHT_X - WINDOW_WIDTH / 20.0)
+                        - (WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0 + WINDOW_WIDTH / 30.0),
+                    PLATFORM_HEIGHT / 4.0,
+                    1.0,
+                ),
+                Some(TEMP_PLATFORM_COLOR),
+            ),
+            TempPlatform,
+        ));
+        commands.spawn((
+            PlatformBundle::new(
+                sign * (((WINDOW_WIDTH / 10.0)
+                    + (WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0 - WINDOW_WIDTH / 30.0))
+                    / 2.0),
+                WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0,
+                Vec3::new(
+                    (WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0 - WINDOW_WIDTH / 30.0)
+                        - WINDOW_WIDTH / 10.0,
+                    PLATFORM_HEIGHT / 4.0,
+                    1.0,
+                ),
+                Some(TEMP_PLATFORM_COLOR),
+            ),
+            TempPlatform,
+        ));
+
         commands.spawn((
             GateBundle::new(
                 (WINDOW_RIGHT_X - WINDOW_WIDTH / 3.2) * sign,
