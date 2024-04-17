@@ -301,7 +301,7 @@ fn reset_berries_collected(mut berries_collected: ResMut<BerriesCollected>) {
 }
 
 fn remove_berries_and_berry_cells(
-    berries: Query<Entity, With<Berry>>,
+    berries: Query<Entity, (With<Berry>, Without<BerryCell>, Without<Player>)>,
     berry_cells: Query<Entity, With<BerryCell>>,
     mut commands: Commands,
 ) {
