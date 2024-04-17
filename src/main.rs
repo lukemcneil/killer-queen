@@ -10,7 +10,7 @@ mod ship;
 
 use animation::AnimationPlugin;
 use berries::BerriesPlugin;
-use bevy::{prelude::*, window::WindowResolution};
+use bevy::{prelude::*, render::camera::ScalingMode, window::WindowResolution};
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 use gates::GatePlugin;
@@ -81,7 +81,12 @@ fn setup(mut commands: Commands) {
         },
         PerfUiEntryFPS::default(),
     ));
-    commands.spawn(Camera2dBundle::default());
+    let mut camera = Camera2dBundle::default();
+    camera.projection.scaling_mode = ScalingMode::AutoMax {
+        max_width: WINDOW_WIDTH,
+        max_height: WINDOW_HEIGHT,
+    };
+    commands.spawn(camera);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -123,7 +128,7 @@ fn set_win_text(
             Text2dBundle {
                 text: Text::from_section(
                     format!(
-                        "{:?} victory by team {:?}",
+                        "{:?} victory by {:?}",
                         win_event.win_condition, win_event.team
                     ),
                     text_style.clone(),
