@@ -7,7 +7,7 @@ use crate::{
         Action, Direction, KnockBackEvent, Player, Team, Wings, PLAYER_JUMP_IMPULSE,
         WORKER_RENDER_HEIGHT,
     },
-    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_WIDTH,
+    GameState, WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_WIDTH,
 };
 
 pub struct ShipPlugin;
@@ -20,16 +20,18 @@ const SHIP_WIN_SPOT_WIDTH: f32 = 50.0;
 
 impl Plugin for ShipPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            Update,
-            (
-                get_on_ship,
-                move_ship,
-                jump_off_ship,
-                color_ships_with_drivers,
-                check_for_ship_win,
-            ),
-        );
+        app.add_systems(OnEnter(GameState::Join), setup)
+            .add_systems(
+                Update,
+                (
+                    get_on_ship,
+                    move_ship,
+                    jump_off_ship,
+                    color_ships_with_drivers,
+                    check_for_ship_win,
+                ),
+            )
+            .add_systems(OnExit(GameState::GameOver), remove_ships);
     }
 }
 
@@ -188,5 +190,11 @@ fn check_for_ship_win(
                 win_condition: WinCondition::Ship,
             });
         }
+    }
+}
+
+fn remove_ships(ships: Query<Entity, With<Ship>>, mut commands: Commands) {
+    for ship in &ships {
+        commands.entity(ship).despawn();
     }
 }

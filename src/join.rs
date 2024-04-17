@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, utils::HashSet};
 use bevy_rapier2d::dynamics::RigidBody;
 use leafwing_input_manager::action_state::ActionState;
 
@@ -15,11 +15,11 @@ const TEMP_PLATFORM_COLOR: Color = Color::BLACK;
 pub struct JoinPlugin;
 
 #[derive(Resource, Default)]
-pub struct JoinedPlayers(pub HashMap<Gamepad, Entity>);
+pub struct JoinedGamepads(pub HashSet<Gamepad>);
 
 impl Plugin for JoinPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<JoinedPlayers>()
+        app.init_resource::<JoinedGamepads>()
             .add_systems(
                 Update,
                 (
@@ -84,7 +84,7 @@ fn delete_temp_platforms(
 }
 
 fn join(
-    joined_players: ResMut<JoinedPlayers>,
+    mut joined_gamepads: ResMut<JoinedGamepads>,
     gamepads: Res<Gamepads>,
     button_inputs: Res<ButtonInput<GamepadButton>>,
     queens: Query<&Team, With<Queen>>,
@@ -107,7 +107,7 @@ fn join(
             let is_queen = !queens.iter().any(|&queen_team| queen_team == team);
 
             // Make sure a player cannot join twice
-            if !joined_players.0.contains_key(&gamepad) {
+            if !joined_gamepads.0.contains(&gamepad) {
                 ev_spawn_players.send(SpawnPlayerEvent {
                     team,
                     is_queen,
@@ -115,6 +115,9 @@ fn join(
                     delay: 0.0,
                     start_invincible: false,
                 });
+                // Insert the created player and its gamepad to the hashmap of joined players
+                // Since uniqueness was already checked above, we can insert here unchecked
+                joined_gamepads.0.insert(gamepad);
             }
         }
     }
@@ -132,7 +135,7 @@ fn disconnect(
         &Team,
         Has<Queen>,
     )>,
-    mut joined_players: ResMut<JoinedPlayers>,
+    mut joined_gamepads: ResMut<JoinedGamepads>,
     asset_server: Res<AssetServer>,
     mut join_gates: Query<(Entity, &Team, &mut Sprite), With<JoinGate>>,
 ) {
@@ -148,7 +151,7 @@ fn disconnect(
     ) in action_query.iter()
     {
         if action_state.pressed(&Action::Disconnect) {
-            joined_players.0.remove(&player.gamepad);
+            joined_gamepads.0.remove(&player.gamepad);
             remove_player(
                 &mut commands,
                 player_entity,

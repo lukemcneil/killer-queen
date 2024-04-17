@@ -59,7 +59,8 @@ fn main() {
         // .add_plugins(WorldInspectorPlugin::new())
         .add_event::<WinEvent>()
         .add_systems(Startup, setup)
-        .add_systems(Update, set_win_text)
+        .add_systems(Update, (set_win_text, start_next_game))
+        .add_systems(OnExit(GameState::GameOver), remove_win_text)
         .run();
 }
 
@@ -68,6 +69,7 @@ enum GameState {
     #[default]
     Join,
     Play,
+    GameOver,
 }
 
 fn setup(mut commands: Commands) {
@@ -95,32 +97,69 @@ pub struct WinEvent {
     pub win_condition: WinCondition,
 }
 
+#[derive(Component)]
+struct WinText;
+
 fn set_win_text(
     mut ev_win: EventReader<WinEvent>,
-    mut game_over: Local<bool>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
+    state: Res<State<GameState>>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if *game_over {
+    if *state.get() != GameState::Play {
         return;
     }
     for win_event in ev_win.read() {
-        *game_over = true;
+        next_state.set(GameState::GameOver);
         let font = asset_server.load("fonts/FiraSans-Bold.ttf");
         let text_style = TextStyle {
             font: font.clone(),
             font_size: 60.0,
             color: win_event.team.color(),
         };
-        commands.spawn(Text2dBundle {
-            text: Text::from_section(
-                format!(
-                    "Team {:?} wins by {:?}",
-                    win_event.team, win_event.win_condition
+        commands.spawn((
+            WinText,
+            Text2dBundle {
+                text: Text::from_section(
+                    format!(
+                        "{:?} victory by team {:?}",
+                        win_event.win_condition, win_event.team
+                    ),
+                    text_style.clone(),
                 ),
-                text_style.clone(),
-            ),
-            ..Default::default()
+                ..Default::default()
+            },
+        ));
+        commands.spawn(NextGameTimer {
+            timer: Timer::from_seconds(3.0, TimerMode::Once),
         });
+    }
+}
+
+fn remove_win_text(win_texts: Query<Entity, With<WinText>>, mut commands: Commands) {
+    for win_text in &win_texts {
+        commands.entity(win_text).despawn();
+    }
+}
+
+#[derive(Component)]
+struct NextGameTimer {
+    timer: Timer,
+}
+
+fn start_next_game(
+    mut next_game_timers: Query<(Entity, &mut NextGameTimer)>,
+    time: Res<Time>,
+    mut commands: Commands,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    for (entity, mut next_game_timer) in &mut next_game_timers {
+        next_game_timer.timer.tick(time.delta());
+
+        if next_game_timer.timer.finished() {
+            commands.entity(entity).despawn();
+            next_state.set(GameState::Join);
+        }
     }
 }

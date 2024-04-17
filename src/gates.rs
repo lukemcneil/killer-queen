@@ -8,7 +8,7 @@ use crate::{
         Crown, Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RENDER_HEIGHT,
         QUEEN_RENDER_WIDTH, WORKER_RENDER_HEIGHT, WORKER_RENDER_WIDTH,
     },
-    WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
+    GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
 };
 
 pub struct GatePlugin;
@@ -19,8 +19,9 @@ const GATE_TIME: f32 = 1.0;
 
 impl Plugin for GatePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, (check_worker_gate_collisions, progress_gate_timers));
+        app.add_systems(OnEnter(GameState::Join), setup)
+            .add_systems(Update, (check_worker_gate_collisions, progress_gate_timers))
+            .add_systems(OnExit(GameState::GameOver), remove_gates);
     }
 }
 
@@ -212,5 +213,11 @@ fn progress_gate_timers(
                 Vec2::new(0.0, -(player_height - WORKER_RENDER_HEIGHT) / 2.0) / player_height,
             )
         }
+    }
+}
+
+fn remove_gates(gates: Query<Entity, With<Gate>>, mut commands: Commands) {
+    for gate in &gates {
+        commands.entity(gate).despawn();
     }
 }

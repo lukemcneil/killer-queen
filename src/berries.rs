@@ -4,8 +4,8 @@ use bevy_rapier2d::prelude::*;
 use crate::{
     platforms::PLATFORM_HEIGHT,
     player::{Player, Team, Wings, WORKER_RENDER_WIDTH},
-    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y,
-    WINDOW_WIDTH,
+    GameState, WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X,
+    WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const BERRY_RENDER_RADIUS: f32 = 10.0;
@@ -15,10 +15,14 @@ pub struct BerriesPlugin;
 impl Plugin for BerriesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BerriesCollected>()
-            .add_systems(Startup, setup)
+            .add_systems(OnEnter(GameState::Join), setup)
             .add_systems(
                 Update,
                 (grab_berries, put_berries_in_cells, check_for_berry_win),
+            )
+            .add_systems(
+                OnExit(GameState::GameOver),
+                (remove_berries_and_berry_cells, reset_berries_collected),
             );
     }
 }
@@ -288,5 +292,23 @@ fn check_for_berry_win(
             team: Team::Blue,
             win_condition,
         });
+    }
+}
+
+fn reset_berries_collected(mut berries_collected: ResMut<BerriesCollected>) {
+    berries_collected.red_berries = 0;
+    berries_collected.blue_berries = 0;
+}
+
+fn remove_berries_and_berry_cells(
+    berries: Query<Entity, With<Berry>>,
+    berry_cells: Query<Entity, With<BerryCell>>,
+    mut commands: Commands,
+) {
+    for berry in &berries {
+        commands.entity(berry).despawn();
+    }
+    for berry_cell in &berry_cells {
+        commands.entity(berry_cell).despawn();
     }
 }

@@ -5,10 +5,7 @@ use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::{
-    animation::Animation,
-    berries::Berry,
-    join::{remove_player, JoinedPlayers},
-    ship::RidingOnShip,
+    animation::Animation, berries::Berry, join::remove_player, ship::RidingOnShip, GameState,
     WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X,
     WINDOW_TOP_Y, WINDOW_WIDTH,
 };
@@ -82,6 +79,10 @@ impl Plugin for PlayerPlugin {
                     spawn_players,
                     handle_invincibility,
                 ),
+            )
+            .add_systems(
+                OnExit(GameState::GameOver),
+                (reset_all_players, reset_queen_lives_counter),
             );
     }
 }
@@ -166,6 +167,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             team,
         ));
     }
+}
+
+fn reset_queen_lives_counter(mut queen_deaths: ResMut<QueenDeaths>) {
+    queen_deaths.red_deaths = 0;
+    queen_deaths.blue_deaths = 0;
 }
 
 fn update_queen_lives_counter(
@@ -604,7 +610,6 @@ fn spawn_players(
     server: Res<AssetServer>,
     mut atlases: ResMut<Assets<TextureAtlasLayout>>,
     mut commands: Commands,
-    mut joined_players: ResMut<JoinedPlayers>,
     mut delayed_player_spawners: Query<(&mut DelayedPlayerSpawner, Entity)>,
     time: Res<Time>,
 ) {
@@ -738,12 +743,6 @@ fn spawn_players(
                     animation_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
                 });
             }
-
-            // Insert the created player and its gamepad to the hashmap of joined players
-            // Since uniqueness was already checked above, we can insert here unchecked
-            joined_players
-                .0
-                .insert_unique_unchecked(ev.gamepad, player.id());
         }
     }
 }
@@ -770,5 +769,22 @@ fn handle_invincibility(
                 .insert(Visibility::Visible)
                 .remove::<Invincible>();
         }
+    }
+}
+
+fn reset_all_players(
+    players: Query<(Entity, &Player, &Team, Has<Queen>)>,
+    mut commands: Commands,
+    mut ev_spawn_players: EventWriter<SpawnPlayerEvent>,
+) {
+    for (entity, player, &team, is_queen) in &players {
+        commands.entity(entity).despawn_recursive();
+        ev_spawn_players.send(SpawnPlayerEvent {
+            team,
+            is_queen,
+            gamepad: player.gamepad,
+            delay: 0.0,
+            start_invincible: false,
+        });
     }
 }
