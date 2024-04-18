@@ -9,6 +9,7 @@ use crate::{
 };
 
 const BERRY_RENDER_RADIUS: f32 = 10.0;
+const BERRIES_TO_WIN: i32 = 6;
 
 pub struct BerriesPlugin;
 
@@ -177,7 +178,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     for team in [Team::Red, Team::Blue] {
-        for x in -2..2 {
+        for x in -2..0 {
             for y in 0..3 {
                 let sign = match team {
                     Team::Red => -1.0,
@@ -281,13 +282,13 @@ fn check_for_berry_win(
     berries_collected: Res<BerriesCollected>,
 ) {
     let win_condition = WinCondition::Economic;
-    if berries_collected.red_berries >= 12 {
+    if berries_collected.red_berries >= BERRIES_TO_WIN {
         ev_win.send(WinEvent {
             team: Team::Red,
             win_condition,
         });
     }
-    if berries_collected.blue_berries >= 12 {
+    if berries_collected.blue_berries >= BERRIES_TO_WIN {
         ev_win.send(WinEvent {
             team: Team::Blue,
             win_condition,
