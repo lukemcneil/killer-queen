@@ -13,6 +13,7 @@ use crate::{
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
 const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_FALL_SPEED: f32 = 400.0;
+const PLAYER_MAX_DIVE_SPEED: f32 = 1200.0;
 const PLAYER_MAX_RISE_SPEED: f32 = 600.0;
 const PLAYER_FLY_IMPULSE: f32 = 67.5;
 pub const PLAYER_JUMP_IMPULSE: f32 = 45.0;
@@ -21,6 +22,7 @@ const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 115.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.3;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
+const DIVE_GRAVITY_SCALE: f32 = 45.0;
 pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.5;
 const RESPAWN_DELAY: f32 = 2.0;
 const INVINCIBILITY_DURATION: f32 = 2.0;
@@ -61,7 +63,7 @@ impl Plugin for PlayerPlugin {
                         (
                             movement,
                             friction,
-                            (fly, jump).before(limit_fall_speed),
+                            (fly, jump, dive).before(limit_fall_speed),
                             limit_fall_speed,
                             update_sprite_direction,
                             apply_movement_animation,
@@ -92,6 +94,7 @@ pub enum Action {
     Move,
     Jump,
     Disconnect,
+    Dive,
 }
 
 #[derive(Component, Debug)]
@@ -255,10 +258,31 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), 
     }
 }
 
-fn limit_fall_speed(mut players: Query<(&mut Velocity, Has<Wings>), With<Player>>) {
-    for (mut velocity, has_wings) in players.iter_mut() {
+fn dive(queens: Query<(Entity, &ActionState<Action>), With<Queen>>, mut commands: Commands) {
+    for (entity, action_state) in &queens {
+        if action_state.just_pressed(&Action::Dive) {
+            commands
+                .entity(entity)
+                .insert(GravityScale(DIVE_GRAVITY_SCALE));
+        }
+        if action_state.just_released(&Action::Dive) {
+            commands
+                .entity(entity)
+                .insert(GravityScale(PLAYER_GRAVITY_SCALE));
+        }
+    }
+}
+
+fn limit_fall_speed(
+    mut players: Query<(&mut Velocity, Has<Wings>, &ActionState<Action>), With<Player>>,
+) {
+    for (mut velocity, has_wings, action_state) in players.iter_mut() {
         velocity.linvel.y = velocity.linvel.y.clamp(
-            -PLAYER_MAX_FALL_SPEED,
+            if action_state.pressed(&Action::Dive) {
+                -PLAYER_MAX_DIVE_SPEED
+            } else {
+                -PLAYER_MAX_FALL_SPEED
+            },
             if has_wings {
                 PLAYER_MAX_RISE_SPEED
             } else {
@@ -637,6 +661,11 @@ fn spawn_players(
             );
             input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
             input_map.insert(Action::Disconnect, GamepadButtonType::Select);
+            input_map.insert(
+                Action::Dive,
+                SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.5),
+            );
+            input_map.insert(Action::Dive, GamepadButtonType::DPadDown);
             input_map.set_gamepad(ev.gamepad);
 
             let (player_width, player_height) = if ev.is_queen {
