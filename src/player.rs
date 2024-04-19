@@ -258,7 +258,7 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), 
     }
 }
 
-fn dive(queens: Query<(Entity, &ActionState<Action>), With<Queen>>, mut commands: Commands) {
+fn dive(queens: Query<(Entity, &ActionState<Action>)>, mut commands: Commands) {
     for (entity, action_state) in &queens {
         if action_state.just_pressed(&Action::Dive) {
             commands
@@ -661,11 +661,13 @@ fn spawn_players(
             );
             input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
             input_map.insert(Action::Disconnect, GamepadButtonType::Select);
-            input_map.insert(
-                Action::Dive,
-                SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.5),
-            );
-            input_map.insert(Action::Dive, GamepadButtonType::DPadDown);
+            if ev.is_queen {
+                input_map.insert(
+                    Action::Dive,
+                    SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.5),
+                );
+                input_map.insert(Action::Dive, GamepadButtonType::DPadDown);
+            }
             input_map.set_gamepad(ev.gamepad);
 
             let (player_width, player_height) = if ev.is_queen {
