@@ -1,4 +1,7 @@
-use std::{f32::MAX, time::Duration};
+use std::{
+    f32::{consts::PI, MAX},
+    time::Duration,
+};
 
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
@@ -204,6 +207,11 @@ fn movement(
     time: Res<Time>,
 ) {
     for (player_entity, player, action_state, mut impulse, mut velocity) in query.iter_mut() {
+        // shouldn't be able to move if dove into ground
+        if action_state.pressed(&Action::Dive) && player.is_on_ground {
+            velocity.linvel.x = 0.0;
+            continue;
+        }
         if action_state.pressed(&Action::Move) {
             let joystick_value = action_state.clamped_value(&Action::Move);
             if joystick_value > 0.0 {
@@ -244,7 +252,7 @@ fn friction(mut query: Query<(&mut ExternalImpulse, &Velocity, &Player)>, time: 
 
 fn fly(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse), With<Wings>>) {
     for (action_state, mut impulse) in query.iter_mut() {
-        if action_state.just_pressed(&Action::Jump) {
+        if action_state.just_pressed(&Action::Jump) && !action_state.pressed(&Action::Dive) {
             impulse.impulse.y += PLAYER_FLY_IMPULSE;
         }
     }
@@ -258,17 +266,19 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), 
     }
 }
 
-fn dive(queens: Query<(Entity, &ActionState<Action>)>, mut commands: Commands) {
-    for (entity, action_state) in &queens {
+fn dive(mut queens: Query<(Entity, &ActionState<Action>, &mut Transform)>, mut commands: Commands) {
+    for (entity, action_state, mut transform) in &mut queens {
         if action_state.just_pressed(&Action::Dive) {
             commands
                 .entity(entity)
                 .insert(GravityScale(DIVE_GRAVITY_SCALE));
+            transform.rotate_z(PI);
         }
         if action_state.just_released(&Action::Dive) {
             commands
                 .entity(entity)
                 .insert(GravityScale(PLAYER_GRAVITY_SCALE));
+            transform.rotate_z(PI);
         }
     }
 }
