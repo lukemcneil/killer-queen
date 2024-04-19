@@ -406,6 +406,7 @@ fn players_attack(
             Option<&RidingOnShip>,
             Has<Queen>,
             Has<Invincible>,
+            &ActionState<Action>,
         ),
         With<Player>,
     >,
@@ -459,26 +460,51 @@ fn players_attack(
                                     } else {
                                         (player2_components, player1_components)
                                     };
+                                let mut apply_knockback = || {
+                                    ev_knockback.send(KnockBackEvent {
+                                        entity: left_player_components.0,
+                                        direction: Direction::Left,
+                                    });
+                                    ev_knockback.send(KnockBackEvent {
+                                        entity: right_player_components.0,
+                                        direction: Direction::Right,
+                                    });
+                                };
                                 let left_player_direction = left_player_components.6;
                                 let right_player_direction = right_player_components.6;
-                                match (left_player_direction, right_player_direction) {
-                                    (Direction::Right, Direction::Right) => {
-                                        Some((right_player_components, left_player_components))
+                                let left_player_diving =
+                                    left_player_components.11.pressed(&Action::Dive);
+                                let right_player_diving =
+                                    right_player_components.11.pressed(&Action::Dive);
+                                match (left_player_diving, right_player_diving) {
+                                    (true, true) => {
+                                        // queens hit while both diving
+                                        apply_knockback();
+                                        continue;
                                     }
-                                    (Direction::Left, Direction::Left) => {
+                                    (true, false) => {
                                         Some((left_player_components, right_player_components))
                                     }
-                                    _ => {
-                                        // hit swords or backs
-                                        ev_knockback.send(KnockBackEvent {
-                                            entity: left_player_components.0,
-                                            direction: Direction::Left,
-                                        });
-                                        ev_knockback.send(KnockBackEvent {
-                                            entity: right_player_components.0,
-                                            direction: Direction::Right,
-                                        });
-                                        continue;
+                                    (false, true) => {
+                                        Some((right_player_components, left_player_components))
+                                    }
+                                    (false, false) => {
+                                        // neither player is diving
+                                        match (left_player_direction, right_player_direction) {
+                                            (Direction::Right, Direction::Right) => Some((
+                                                right_player_components,
+                                                left_player_components,
+                                            )),
+                                            (Direction::Left, Direction::Left) => Some((
+                                                left_player_components,
+                                                right_player_components,
+                                            )),
+                                            _ => {
+                                                // hit swords or backs
+                                                apply_knockback();
+                                                continue;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -520,6 +546,7 @@ fn players_attack(
                         maybe_riding_on_ship,
                         killed_player_is_queen,
                         killed_player_invincible,
+                        _,
                     ) = killed_player_components;
                     if killed_player_invincible {
                         continue;
@@ -674,7 +701,7 @@ fn spawn_players(
             if ev.is_queen {
                 input_map.insert(
                     Action::Dive,
-                    SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.5),
+                    SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.9),
                 );
                 input_map.insert(Action::Dive, GamepadButtonType::DPadDown);
             }
