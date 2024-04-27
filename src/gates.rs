@@ -13,7 +13,7 @@ use crate::{
 
 pub struct GatePlugin;
 
-const GATE_WIDTH: f32 = WORKER_RENDER_WIDTH * 1.5;
+const GATE_WIDTH: f32 = WORKER_RENDER_WIDTH * 1.2;
 pub const GATE_HEIGHT: f32 = WORKER_RENDER_HEIGHT * 1.5;
 const GATE_TIME: f32 = 1.0;
 
