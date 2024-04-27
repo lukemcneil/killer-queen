@@ -137,6 +137,7 @@ fn set_win_text(
                     ),
                     text_style.clone(),
                 ),
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, 100.0)),
                 ..Default::default()
             },
         ));

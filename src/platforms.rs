@@ -22,7 +22,7 @@ impl PlatformBundle {
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(x, y, 0.0),
+                    translation: Vec3::new(x, y, -10.0),
                     scale,
                     ..Default::default()
                 },

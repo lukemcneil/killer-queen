@@ -8,7 +8,7 @@ use crate::{
     WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
-const BERRY_RENDER_RADIUS: f32 = 10.0;
+const BERRY_RENDER_RADIUS: f32 = 12.0;
 const BERRIES_TO_WIN: i32 = 6;
 
 pub struct BerriesPlugin;
@@ -30,7 +30,7 @@ impl Plugin for BerriesPlugin {
 
 #[derive(Default, Resource)]
 pub struct BerriesCollected {
-    yellow_berries: i32,
+    orange_berries: i32,
     purple_berries: i32,
 }
 
@@ -108,6 +108,22 @@ impl BerryCellBundle {
 }
 
 fn spawn_berry_bunch(x: f32, y: f32, commands: &mut Commands, asset_server: &Res<AssetServer>) {
+    let texture = asset_server.load("flower.png");
+    commands.spawn(SpriteBundle {
+        texture,
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(
+                BERRY_RENDER_RADIUS * 8.0,
+                BERRY_RENDER_RADIUS * 7.0 / 4.0,
+            )),
+            ..Default::default()
+        },
+        transform: Transform {
+            translation: Vec3::new(x, y - (11.0 / 8.0) * BERRY_RENDER_RADIUS, -2.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
     for i in [-1.0, 0.0, 1.0] {
         commands
             .spawn(BerryBundle::new(
@@ -136,22 +152,6 @@ fn spawn_berry_bunch(x: f32, y: f32, commands: &mut Commands, asset_server: &Res
             asset_server,
         ))
         .insert(Sensor);
-    let texture = asset_server.load("flower.png");
-    commands.spawn(SpriteBundle {
-        texture,
-        sprite: Sprite {
-            custom_size: Some(Vec2::new(
-                BERRY_RENDER_RADIUS * 8.0,
-                BERRY_RENDER_RADIUS * 7.0 / 4.0,
-            )),
-            ..Default::default()
-        },
-        transform: Transform {
-            translation: Vec3::new(x, y - 1.8 * BERRY_RENDER_RADIUS, 1.0),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -193,16 +193,16 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         spawn_berry_bunch(x, y, &mut commands, &asset_server)
     }
 
-    for team in [Team::Yellow, Team::Purple] {
+    for team in [Team::Orange, Team::Purple] {
         for x in -2..0 {
             for y in 0..3 {
                 let sign = match team {
-                    Team::Yellow => -1.0,
+                    Team::Orange => -1.0,
                     Team::Purple => 1.0,
                 };
                 commands.spawn(BerryCellBundle::new(
                     (WINDOW_WIDTH / 20.0 + x as f32 * BERRY_RENDER_RADIUS * 2.1) * sign,
-                    WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0) + y as f32 * BERRY_RENDER_RADIUS * 2.1,
+                    WINDOW_TOP_Y - (WINDOW_HEIGHT / 7.5) + y as f32 * BERRY_RENDER_RADIUS * 2.1,
                     team,
                     &asset_server,
                 ));
@@ -271,7 +271,7 @@ fn put_berries_in_cells(
                         }
                         if berry_cell_team == player_team {
                             match player_team {
-                                Team::Yellow => berries_collected.yellow_berries += 1,
+                                Team::Orange => berries_collected.orange_berries += 1,
                                 Team::Purple => berries_collected.purple_berries += 1,
                             };
                             commands
@@ -298,9 +298,9 @@ fn check_for_berry_win(
     berries_collected: Res<BerriesCollected>,
 ) {
     let win_condition = WinCondition::Economic;
-    if berries_collected.yellow_berries >= BERRIES_TO_WIN {
+    if berries_collected.orange_berries >= BERRIES_TO_WIN {
         ev_win.send(WinEvent {
-            team: Team::Yellow,
+            team: Team::Orange,
             win_condition,
         });
     }
@@ -313,7 +313,7 @@ fn check_for_berry_win(
 }
 
 fn reset_berries_collected(mut berries_collected: ResMut<BerriesCollected>) {
-    berries_collected.yellow_berries = 0;
+    berries_collected.orange_berries = 0;
     berries_collected.purple_berries = 0;
 }
 

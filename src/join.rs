@@ -122,7 +122,7 @@ fn join(
             let team = if button_inputs
                 .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
             {
-                Team::Yellow
+                Team::Orange
             } else {
                 Team::Purple
             };

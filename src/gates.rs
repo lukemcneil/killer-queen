@@ -48,7 +48,7 @@ impl GateBundle {
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(x, y, -1.0),
+                    translation: Vec3::new(x, y, -11.0),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -185,7 +185,7 @@ fn progress_gate_timers(
                 ))
                 .despawn_descendants();
             commands.entity(entity).insert(match team {
-                Team::Yellow => asset_server.load::<Image>("spritesheets/fighterYellow.png"),
+                Team::Orange => asset_server.load::<Image>("spritesheets/fighterYellow.png"),
                 Team::Purple => asset_server.load::<Image>("spritesheets/fighterPurple.png"),
             });
         } else {
