@@ -15,15 +15,15 @@ const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_FALL_SPEED: f32 = 400.0;
 const PLAYER_MAX_DIVE_SPEED: f32 = 1200.0;
 const PLAYER_MAX_RISE_SPEED: f32 = 600.0;
-const PLAYER_FLY_IMPULSE: f32 = 55.0;
-pub const PLAYER_JUMP_IMPULSE: f32 = 35.0;
+const PLAYER_FLY_IMPULSE: f32 = 73.0;
+pub const PLAYER_JUMP_IMPULSE: f32 = 46.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 115.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.3;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 const DIVE_GRAVITY_SCALE: f32 = 45.0;
-pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.3;
+pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.4;
 const RESPAWN_DELAY: f32 = 2.0;
 const INVINCIBILITY_DURATION: f32 = 2.0;
 
@@ -32,7 +32,30 @@ const SPRITESHEET_ROWS: usize = 2;
 
 const SPRITE_TILE_WIDTH: f32 = 25.0;
 const SPRITE_TILE_HEIGHT: f32 = 25.0;
-const SPRITE_PADDING: f32 = 3.0;
+const QUEEN_PADDING_X: f32 = 2.0;
+const QUEEN_PADDING_Y: f32 = 3.0;
+pub const QUEEN_RECT: Rect = Rect {
+    min: Vec2 {
+        x: QUEEN_PADDING_X,
+        y: QUEEN_PADDING_Y,
+    },
+    max: Vec2 {
+        x: SPRITE_TILE_WIDTH - QUEEN_PADDING_X,
+        y: SPRITE_TILE_HEIGHT - QUEEN_PADDING_Y,
+    },
+};
+const WORKER_PADDING_X: f32 = 2.0;
+const WORKER_PADDING_Y: f32 = 5.0;
+const WORKER_RECT: Rect = Rect {
+    min: Vec2 {
+        x: WORKER_PADDING_X,
+        y: WORKER_PADDING_Y,
+    },
+    max: Vec2 {
+        x: SPRITE_TILE_WIDTH - WORKER_PADDING_X,
+        y: SPRITE_TILE_HEIGHT - WORKER_PADDING_Y,
+    },
+};
 
 pub const WORKER_RENDER_WIDTH: f32 = 40.0;
 pub const WORKER_RENDER_HEIGHT: f32 = 40.0;
@@ -365,7 +388,7 @@ fn update_sprite_direction(
                 if let Ok((mut sprite, mut transform)) = player_accessories.get_mut(*child) {
                     sprite.flip_x = should_flip_x;
                     transform.translation.x =
-                        if should_flip_x { 1.0 } else { -1.0 } * transform.translation.x.abs();
+                        if should_flip_x { -1.0 } else { 1.0 } * transform.translation.x.abs();
                 }
             }
         }
@@ -731,16 +754,7 @@ fn spawn_players(
                         ..Default::default()
                     },
                     sprite: Sprite {
-                        rect: Some(Rect {
-                            min: Vec2 {
-                                x: SPRITE_PADDING,
-                                y: SPRITE_PADDING,
-                            },
-                            max: Vec2 {
-                                x: SPRITE_TILE_WIDTH - SPRITE_PADDING,
-                                y: SPRITE_TILE_HEIGHT - SPRITE_PADDING,
-                            },
-                        }),
+                        rect: Some(if ev.is_queen { QUEEN_RECT } else { WORKER_RECT }),
                         custom_size: Some(Vec2 {
                             x: player_width,
                             y: player_height,

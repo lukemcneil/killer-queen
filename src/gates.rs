@@ -5,8 +5,8 @@ use bevy_rapier2d::prelude::*;
 use crate::{
     berries::Berry,
     player::{
-        Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RENDER_HEIGHT,
-        QUEEN_RENDER_WIDTH, WORKER_RENDER_HEIGHT, WORKER_RENDER_WIDTH,
+        Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RECT,
+        QUEEN_RENDER_HEIGHT, QUEEN_RENDER_WIDTH, WORKER_RENDER_HEIGHT, WORKER_RENDER_WIDTH,
     },
     GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
 };
@@ -172,6 +172,7 @@ fn progress_gate_timers(
                 y: player_height,
             });
             sprite.anchor = Anchor::Center;
+            sprite.rect = Some(QUEEN_RECT);
             transform.translation.y += (QUEEN_RENDER_HEIGHT - WORKER_RENDER_HEIGHT) / 2.0;
             commands
                 .entity(entity)
