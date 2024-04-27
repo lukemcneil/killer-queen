@@ -185,7 +185,7 @@ fn progress_gate_timers(
                 ))
                 .despawn_descendants();
             commands.entity(entity).insert(match team {
-                Team::Orange => asset_server.load::<Image>("spritesheets/fighterYellow.png"),
+                Team::Yellow => asset_server.load::<Image>("spritesheets/fighterYellow.png"),
                 Team::Purple => asset_server.load::<Image>("spritesheets/fighterPurple.png"),
             });
         } else {

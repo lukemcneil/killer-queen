@@ -30,7 +30,7 @@ impl Plugin for BerriesPlugin {
 
 #[derive(Default, Resource)]
 pub struct BerriesCollected {
-    orange_berries: i32,
+    yellow_berries: i32,
     purple_berries: i32,
 }
 
@@ -193,11 +193,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         spawn_berry_bunch(x, y, &mut commands, &asset_server)
     }
 
-    for team in [Team::Orange, Team::Purple] {
+    for team in [Team::Yellow, Team::Purple] {
         for x in -2..0 {
             for y in 0..3 {
                 let sign = match team {
-                    Team::Orange => -1.0,
+                    Team::Yellow => -1.0,
                     Team::Purple => 1.0,
                 };
                 commands.spawn(BerryCellBundle::new(
@@ -271,7 +271,7 @@ fn put_berries_in_cells(
                         }
                         if berry_cell_team == player_team {
                             match player_team {
-                                Team::Orange => berries_collected.orange_berries += 1,
+                                Team::Yellow => berries_collected.yellow_berries += 1,
                                 Team::Purple => berries_collected.purple_berries += 1,
                             };
                             commands
@@ -298,9 +298,9 @@ fn check_for_berry_win(
     berries_collected: Res<BerriesCollected>,
 ) {
     let win_condition = WinCondition::Economic;
-    if berries_collected.orange_berries >= BERRIES_TO_WIN {
+    if berries_collected.yellow_berries >= BERRIES_TO_WIN {
         ev_win.send(WinEvent {
-            team: Team::Orange,
+            team: Team::Yellow,
             win_condition,
         });
     }
@@ -313,7 +313,7 @@ fn check_for_berry_win(
 }
 
 fn reset_berries_collected(mut berries_collected: ResMut<BerriesCollected>) {
-    berries_collected.orange_berries = 0;
+    berries_collected.yellow_berries = 0;
     berries_collected.purple_berries = 0;
 }
 

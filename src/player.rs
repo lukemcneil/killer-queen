@@ -128,14 +128,14 @@ pub enum Direction {
 
 #[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Team {
-    Orange,
+    Yellow,
     Purple,
 }
 
 impl Team {
     pub fn color(&self) -> Color {
         match self {
-            Team::Orange => Color::ORANGE,
+            Team::Yellow => Color::ORANGE,
             Team::Purple => Color::PURPLE,
         }
     }
@@ -152,7 +152,7 @@ struct Invincible {
 
 #[derive(Default, Resource)]
 pub struct QueenDeaths {
-    orange_deaths: i32,
+    yellow_deaths: i32,
     purple_deaths: i32,
 }
 
@@ -167,7 +167,7 @@ pub struct Player {
 pub struct Wings;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    for team in [Team::Orange, Team::Purple] {
+    for team in [Team::Yellow, Team::Purple] {
         let font = asset_server.load("fonts/FiraSans-Bold.ttf");
         let text_style = TextStyle {
             font: font.clone(),
@@ -179,7 +179,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 text: Text::from_section("", text_style.clone()),
                 transform: Transform::from_translation(Vec3::new(
                     match team {
-                        Team::Orange => -WINDOW_WIDTH / 20.0,
+                        Team::Yellow => -WINDOW_WIDTH / 20.0,
                         Team::Purple => WINDOW_WIDTH / 20.0,
                     },
                     WINDOW_TOP_Y - (WINDOW_HEIGHT / 30.0),
@@ -193,7 +193,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn reset_queen_lives_counter(mut queen_deaths: ResMut<QueenDeaths>) {
-    queen_deaths.orange_deaths = 0;
+    queen_deaths.yellow_deaths = 0;
     queen_deaths.purple_deaths = 0;
 }
 
@@ -205,7 +205,7 @@ fn update_queen_lives_counter(
         counter_text.sections[0].value = format!(
             "Lives: {}",
             3 - match counter_team {
-                Team::Orange => queen_deaths.orange_deaths,
+                Team::Yellow => queen_deaths.yellow_deaths,
                 Team::Purple => queen_deaths.purple_deaths,
             }
         )
@@ -566,7 +566,7 @@ fn players_attack(
                     }
                     if killed_player_is_queen {
                         match killed_player_team {
-                            Team::Orange => queen_deaths.orange_deaths += 1,
+                            Team::Yellow => queen_deaths.yellow_deaths += 1,
                             Team::Purple => queen_deaths.purple_deaths += 1,
                         }
                     }
@@ -631,7 +631,7 @@ fn check_if_players_on_ground(
 
 fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Res<QueenDeaths>) {
     let win_condition = WinCondition::Military;
-    if queen_deaths.orange_deaths >= 3 {
+    if queen_deaths.yellow_deaths >= 3 {
         ev_win.send(WinEvent {
             team: Team::Purple,
             win_condition,
@@ -639,7 +639,7 @@ fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Re
     }
     if queen_deaths.purple_deaths >= 3 {
         ev_win.send(WinEvent {
-            team: Team::Orange,
+            team: Team::Yellow,
             win_condition,
         });
     }
@@ -682,9 +682,9 @@ fn add_delayed_player_spawners(
 
 fn get_spritesheet(team: Team, is_queen: bool) -> String {
     match (team, is_queen) {
-        (Team::Orange, true) => String::from("spritesheets/queenYellow.png"),
+        (Team::Yellow, true) => String::from("spritesheets/queenYellow.png"),
         (Team::Purple, true) => String::from("spritesheets/queenPurple.png"),
-        (Team::Orange, false) => String::from("spritesheets/workerYellow.png"),
+        (Team::Yellow, false) => String::from("spritesheets/workerYellow.png"),
         (Team::Purple, false) => String::from("spritesheets/workerPurple.png"),
     }
 }
@@ -745,7 +745,7 @@ fn spawn_players(
                     transform: Transform {
                         translation: Vec3::new(
                             match ev.team {
-                                Team::Orange => -WINDOW_WIDTH / 20.0,
+                                Team::Yellow => -WINDOW_WIDTH / 20.0,
                                 Team::Purple => WINDOW_WIDTH / 20.0,
                             },
                             WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
@@ -771,7 +771,7 @@ fn spawn_players(
                 Name::new("Player"),
                 InputManagerBundle::with_map(input_map),
                 match ev.team {
-                    Team::Orange => Direction::Left,
+                    Team::Yellow => Direction::Left,
                     Team::Purple => Direction::Right,
                 },
                 ev.team,
