@@ -201,12 +201,9 @@ fn movement(
     time: Res<Time>,
 ) {
     for (player_entity, player, action_state, mut impulse, mut velocity) in query.iter_mut() {
-        // shouldn't be able to move if dove into ground
-        if action_state.pressed(&Action::Dive) && player.is_on_ground {
-            velocity.linvel.x = 0.0;
-            continue;
-        }
-        if action_state.pressed(&Action::Move) {
+        if action_state.pressed(&Action::Move)
+            && !(action_state.pressed(&Action::Dive) && player.is_on_ground)
+        {
             let joystick_value = action_state.clamped_value(&Action::Move);
             if joystick_value > 0.0 {
                 commands.entity(player_entity).insert(Direction::Right);
