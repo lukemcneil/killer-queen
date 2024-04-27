@@ -112,7 +112,7 @@ pub enum Team {
 impl Team {
     pub fn color(&self) -> Color {
         match self {
-            Team::Yellow => Color::YELLOW,
+            Team::Yellow => Color::ORANGE,
             Team::Purple => Color::PURPLE,
         }
     }
@@ -311,7 +311,7 @@ fn apply_movement_animation(
     for (player_entity, velocity, player, animation) in query.iter() {
         if is_running(velocity)
             && player.is_on_ground
-            && animation.map_or(true, |animation| animation.sprites != SPRITE_IDX_WALKING)
+            && animation.map_or(true, |animation| animation.sprites == SPRITE_IDX_FLYING)
         {
             commands
                 .entity(player_entity)
@@ -344,7 +344,7 @@ fn apply_fly_sprite(
 ) {
     for (player_entity, player, animation) in query.iter_mut() {
         if !player.is_on_ground
-            && animation.map_or(true, |animation| animation.sprites != SPRITE_IDX_FLYING)
+            && animation.map_or(true, |animation| animation.sprites == SPRITE_IDX_WALKING)
         {
             commands
                 .entity(player_entity)
@@ -476,17 +476,6 @@ fn players_attack(
                                 let right_player_diving =
                                     right_player_components.11.pressed(&Action::Dive);
                                 match (left_player_diving, right_player_diving) {
-                                    (true, true) => {
-                                        // queens hit while both diving
-                                        apply_knockback();
-                                        continue;
-                                    }
-                                    (true, false) => {
-                                        Some((left_player_components, right_player_components))
-                                    }
-                                    (false, true) => {
-                                        Some((right_player_components, left_player_components))
-                                    }
                                     (false, false) => {
                                         // neither player is diving
                                         match (left_player_direction, right_player_direction) {
@@ -504,6 +493,11 @@ fn players_attack(
                                                 continue;
                                             }
                                         }
+                                    }
+                                    _ => {
+                                        // queens hit with one or both diving
+                                        apply_knockback();
+                                        continue;
                                     }
                                 }
                             }
