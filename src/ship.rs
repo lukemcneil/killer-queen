@@ -76,7 +76,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let y = WINDOW_BOTTOM_Y + WINDOW_HEIGHT / 36.0;
     commands.spawn(ShipBundle::new(0.0, y, &asset_server));
     let texture = asset_server.load("ship-target.png");
-    for (sign, team) in [(-1.0, Team::Red), (1.0, Team::Blue)] {
+    for (sign, team) in [(-1.0, Team::Yellow), (1.0, Team::Purple)] {
         commands.spawn(SpriteBundle {
             texture: texture.clone(),
             sprite: Sprite {
@@ -138,8 +138,8 @@ fn move_ship(
     for (mut worker_transform, riding_on_ship) in workers_on_ships.iter_mut() {
         let (team, mut ship_transform) = ships.get_mut(riding_on_ship.ship).unwrap();
         let direction = match team {
-            Team::Red => -1.0,
-            Team::Blue => 1.0,
+            Team::Yellow => -1.0,
+            Team::Purple => 1.0,
         };
         ship_transform.translation.x += direction * SHIP_SPEED * time.delta_seconds();
         worker_transform.translation = ship_transform.translation;

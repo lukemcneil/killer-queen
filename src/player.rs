@@ -1,7 +1,4 @@
-use std::{
-    f32::{consts::PI, MAX},
-    time::Duration,
-};
+use std::{f32::MAX, time::Duration};
 
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
@@ -18,34 +15,34 @@ const PLAYER_MIN_VELOCITY_X: f32 = 40.0;
 const PLAYER_MAX_FALL_SPEED: f32 = 400.0;
 const PLAYER_MAX_DIVE_SPEED: f32 = 1200.0;
 const PLAYER_MAX_RISE_SPEED: f32 = 600.0;
-const PLAYER_FLY_IMPULSE: f32 = 67.5;
-pub const PLAYER_JUMP_IMPULSE: f32 = 45.0;
+const PLAYER_FLY_IMPULSE: f32 = 55.0;
+pub const PLAYER_JUMP_IMPULSE: f32 = 35.0;
 const PLAYER_MOVEMENT_IMPULSE_GROUND: f32 = 180.0;
 const PLAYER_MOVEMENT_IMPULSE_AIR: f32 = 115.0;
 const PLAYER_FRICTION_GROUND: f32 = 0.5;
 const PLAYER_FRICTION_AIR: f32 = 0.3;
 const PLAYER_GRAVITY_SCALE: f32 = 15.0;
 const DIVE_GRAVITY_SCALE: f32 = 45.0;
-pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.5;
+pub const PLAYER_COLLIDER_WIDTH_MULTIPLIER: f32 = 0.3;
 const RESPAWN_DELAY: f32 = 2.0;
 const INVINCIBILITY_DURATION: f32 = 2.0;
 
-const SPRITESHEET_COLS: usize = 7;
-const SPRITESHEET_ROWS: usize = 8;
+const SPRITESHEET_COLS: usize = 2;
+const SPRITESHEET_ROWS: usize = 2;
 
-const SPRITE_TILE_WIDTH: f32 = 128.0;
-const SPRITE_TILE_HEIGHT: f32 = 256.0;
-const SPRITE_TILE_ACTUAL_HEIGHT: f32 = 160.0;
+const SPRITE_TILE_WIDTH: f32 = 25.0;
+const SPRITE_TILE_HEIGHT: f32 = 25.0;
+const SPRITE_PADDING: f32 = 3.0;
 
-pub const WORKER_RENDER_WIDTH: f32 = 32.0;
+pub const WORKER_RENDER_WIDTH: f32 = 40.0;
 pub const WORKER_RENDER_HEIGHT: f32 = 40.0;
-pub const QUEEN_RENDER_WIDTH: f32 = 48.0;
+pub const QUEEN_RENDER_WIDTH: f32 = 60.0;
 pub const QUEEN_RENDER_HEIGHT: f32 = 60.0;
 
-const SPRITE_IDX_STAND: usize = 28;
-const SPRITE_IDX_WALKING: &[usize] = &[7, 0];
-const SPRITE_IDX_JUMP: usize = 35;
-const SPRITE_IDX_FALL: usize = 42;
+const SPRITE_IDX_STAND: usize = 0;
+const SPRITE_IDX_WALKING: &[usize] = &[1, 0];
+const SPRITE_IDX_FLYING: &[usize] = &[2, 0];
+const SPRITE_IDX_DIVING: &[usize] = &[3];
 
 const CYCLE_DELAY: Duration = Duration::from_millis(70);
 
@@ -71,7 +68,7 @@ impl Plugin for PlayerPlugin {
                             update_sprite_direction,
                             apply_movement_animation,
                             apply_idle_sprite.after(movement),
-                            apply_jump_sprite,
+                            apply_fly_sprite,
                         )
                             .after(check_if_players_on_ground),
                     )
@@ -108,12 +105,18 @@ pub enum Direction {
 
 #[derive(Component, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Team {
-    Red,
-    Blue,
+    Yellow,
+    Purple,
 }
 
-#[derive(Component)]
-pub struct Crown;
+impl Team {
+    pub fn color(&self) -> Color {
+        match self {
+            Team::Yellow => Color::YELLOW,
+            Team::Purple => Color::PURPLE,
+        }
+    }
+}
 
 #[derive(Component)]
 pub struct Queen;
@@ -126,17 +129,8 @@ struct Invincible {
 
 #[derive(Default, Resource)]
 pub struct QueenDeaths {
-    red_deaths: i32,
-    blue_deaths: i32,
-}
-
-impl Team {
-    pub fn color(&self) -> Color {
-        match self {
-            Team::Red => Color::rgb_u8(235, 33, 46),
-            Team::Blue => Color::rgb_u8(46, 103, 248),
-        }
-    }
+    yellow_deaths: i32,
+    purple_deaths: i32,
 }
 
 #[derive(Component)]
@@ -150,7 +144,7 @@ pub struct Player {
 pub struct Wings;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    for team in [Team::Red, Team::Blue] {
+    for team in [Team::Yellow, Team::Purple] {
         let font = asset_server.load("fonts/FiraSans-Bold.ttf");
         let text_style = TextStyle {
             font: font.clone(),
@@ -162,8 +156,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 text: Text::from_section("", text_style.clone()),
                 transform: Transform::from_translation(Vec3::new(
                     match team {
-                        Team::Red => -WINDOW_WIDTH / 20.0,
-                        Team::Blue => WINDOW_WIDTH / 20.0,
+                        Team::Yellow => -WINDOW_WIDTH / 20.0,
+                        Team::Purple => WINDOW_WIDTH / 20.0,
                     },
                     WINDOW_TOP_Y - (WINDOW_HEIGHT / 30.0),
                     2.0,
@@ -176,8 +170,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 fn reset_queen_lives_counter(mut queen_deaths: ResMut<QueenDeaths>) {
-    queen_deaths.red_deaths = 0;
-    queen_deaths.blue_deaths = 0;
+    queen_deaths.yellow_deaths = 0;
+    queen_deaths.purple_deaths = 0;
 }
 
 fn update_queen_lives_counter(
@@ -188,8 +182,8 @@ fn update_queen_lives_counter(
         counter_text.sections[0].value = format!(
             "Lives: {}",
             3 - match counter_team {
-                Team::Red => queen_deaths.red_deaths,
-                Team::Blue => queen_deaths.blue_deaths,
+                Team::Yellow => queen_deaths.yellow_deaths,
+                Team::Purple => queen_deaths.purple_deaths,
             }
         )
     }
@@ -266,19 +260,19 @@ fn jump(mut query: Query<(&ActionState<Action>, &mut ExternalImpulse, &Player), 
     }
 }
 
-fn dive(mut queens: Query<(Entity, &ActionState<Action>, &mut Transform)>, mut commands: Commands) {
-    for (entity, action_state, mut transform) in &mut queens {
+fn dive(mut queens: Query<(Entity, &ActionState<Action>)>, mut commands: Commands) {
+    for (entity, action_state) in &mut queens {
         if action_state.just_pressed(&Action::Dive) {
             commands
                 .entity(entity)
-                .insert(GravityScale(DIVE_GRAVITY_SCALE));
-            transform.rotate_z(PI);
+                .insert(GravityScale(DIVE_GRAVITY_SCALE))
+                .insert(Animation::new(SPRITE_IDX_DIVING, CYCLE_DELAY));
         }
         if action_state.just_released(&Action::Dive) {
             commands
                 .entity(entity)
-                .insert(GravityScale(PLAYER_GRAVITY_SCALE));
-            transform.rotate_z(PI);
+                .insert(GravityScale(PLAYER_GRAVITY_SCALE))
+                .remove::<Animation>();
         }
     }
 }
@@ -312,10 +306,13 @@ fn is_running(velocity: &Velocity) -> bool {
 
 fn apply_movement_animation(
     mut commands: Commands,
-    query: Query<(Entity, &Velocity, &Player), Without<Animation>>,
+    query: Query<(Entity, &Velocity, &Player, Option<&Animation>)>,
 ) {
-    for (player_entity, velocity, player) in query.iter() {
-        if is_running(velocity) && player.is_on_ground {
+    for (player_entity, velocity, player, animation) in query.iter() {
+        if is_running(velocity)
+            && player.is_on_ground
+            && animation.map_or(true, |animation| animation.sprites != SPRITE_IDX_WALKING)
+        {
             commands
                 .entity(player_entity)
                 .insert(Animation::new(SPRITE_IDX_WALKING, CYCLE_DELAY));
@@ -325,43 +322,45 @@ fn apply_movement_animation(
 
 fn apply_idle_sprite(
     mut commands: Commands,
-    mut query: Query<(Entity, &Velocity, &mut TextureAtlas, &Player)>,
+    mut query: Query<(
+        Entity,
+        &Velocity,
+        &mut TextureAtlas,
+        &Player,
+        &ActionState<Action>,
+    )>,
 ) {
-    for (player_entity, velocity, mut sprite, player) in query.iter_mut() {
-        if !is_running(velocity) && player.is_on_ground {
+    for (player_entity, velocity, mut sprite, player, action_state) in query.iter_mut() {
+        if !is_running(velocity) && player.is_on_ground && !action_state.pressed(&Action::Dive) {
             commands.entity(player_entity).remove::<Animation>();
             sprite.index = SPRITE_IDX_STAND
         }
     }
 }
 
-fn apply_jump_sprite(
+fn apply_fly_sprite(
     mut commands: Commands,
-    mut query: Query<(Entity, &Velocity, &mut TextureAtlas, &Player)>,
+    mut query: Query<(Entity, &Player, Option<&Animation>)>,
 ) {
-    for (player_entity, velocity, mut sprite, player) in query.iter_mut() {
-        if !player.is_on_ground {
-            commands.entity(player_entity).remove::<Animation>();
-            if velocity.linvel.y > 0.0 {
-                sprite.index = SPRITE_IDX_JUMP
-            } else {
-                sprite.index = SPRITE_IDX_FALL
-            }
+    for (player_entity, player, animation) in query.iter_mut() {
+        if !player.is_on_ground
+            && animation.map_or(true, |animation| animation.sprites != SPRITE_IDX_FLYING)
+        {
+            commands
+                .entity(player_entity)
+                .insert(Animation::new(SPRITE_IDX_FLYING, CYCLE_DELAY));
         }
     }
 }
 
 fn update_sprite_direction(
     mut query: Query<(&mut Sprite, &Direction, Option<&Children>), With<Player>>,
-    mut player_accessories: Query<
-        (&mut Sprite, &mut Transform),
-        (Or<(With<Crown>, With<Berry>)>, Without<Player>),
-    >,
+    mut player_accessories: Query<(&mut Sprite, &mut Transform), (With<Berry>, Without<Player>)>,
 ) {
     for (mut sprite, direction, maybe_children) in query.iter_mut() {
         let should_flip_x = match direction {
-            Direction::Right => false,
-            Direction::Left => true,
+            Direction::Right => true,
+            Direction::Left => false,
         };
         sprite.flip_x = should_flip_x;
         if let Some(children) = maybe_children {
@@ -553,8 +552,8 @@ fn players_attack(
                     }
                     if killed_player_is_queen {
                         match killed_player_team {
-                            Team::Red => queen_deaths.red_deaths += 1,
-                            Team::Blue => queen_deaths.blue_deaths += 1,
+                            Team::Yellow => queen_deaths.yellow_deaths += 1,
+                            Team::Purple => queen_deaths.purple_deaths += 1,
                         }
                     }
                     remove_player(
@@ -618,15 +617,15 @@ fn check_if_players_on_ground(
 
 fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Res<QueenDeaths>) {
     let win_condition = WinCondition::Military;
-    if queen_deaths.red_deaths >= 3 {
+    if queen_deaths.yellow_deaths >= 3 {
         ev_win.send(WinEvent {
-            team: Team::Blue,
+            team: Team::Purple,
             win_condition,
         });
     }
-    if queen_deaths.blue_deaths >= 3 {
+    if queen_deaths.purple_deaths >= 3 {
         ev_win.send(WinEvent {
-            team: Team::Red,
+            team: Team::Yellow,
             win_condition,
         });
     }
@@ -667,6 +666,15 @@ fn add_delayed_player_spawners(
     }
 }
 
+fn get_spritesheet(team: Team, is_queen: bool) -> String {
+    match (team, is_queen) {
+        (Team::Yellow, true) => String::from("spritesheets/queenYellow.png"),
+        (Team::Purple, true) => String::from("spritesheets/queenPurple.png"),
+        (Team::Yellow, false) => String::from("spritesheets/workerYellow.png"),
+        (Team::Purple, false) => String::from("spritesheets/workerPurple.png"),
+    }
+}
+
 fn spawn_players(
     server: Res<AssetServer>,
     mut atlases: ResMut<Assets<TextureAtlasLayout>>,
@@ -680,7 +688,7 @@ fn spawn_players(
         if delayed_player_spawner.timer.finished() {
             commands.entity(entity).despawn();
             let ev = delayed_player_spawner.event;
-            let texture: Handle<Image> = server.load("spritesheets/spritesheet_players.png");
+            let texture: Handle<Image> = server.load(get_spritesheet(ev.team, ev.is_queen));
             let texture_atlas = TextureAtlasLayout::from_grid(
                 Vec2::new(SPRITE_TILE_WIDTH, SPRITE_TILE_HEIGHT),
                 SPRITESHEET_COLS,
@@ -723,8 +731,8 @@ fn spawn_players(
                     transform: Transform {
                         translation: Vec3::new(
                             match ev.team {
-                                Team::Red => -WINDOW_WIDTH / 20.0,
-                                Team::Blue => WINDOW_WIDTH / 20.0,
+                                Team::Yellow => -WINDOW_WIDTH / 20.0,
+                                Team::Purple => WINDOW_WIDTH / 20.0,
                             },
                             WINDOW_TOP_Y - (WINDOW_HEIGHT / 9.0),
                             2.0,
@@ -734,19 +742,18 @@ fn spawn_players(
                     sprite: Sprite {
                         rect: Some(Rect {
                             min: Vec2 {
-                                x: 0.0,
-                                y: SPRITE_TILE_HEIGHT - SPRITE_TILE_ACTUAL_HEIGHT,
+                                x: SPRITE_PADDING,
+                                y: SPRITE_PADDING,
                             },
                             max: Vec2 {
-                                x: SPRITE_TILE_WIDTH,
-                                y: SPRITE_TILE_HEIGHT,
+                                x: SPRITE_TILE_WIDTH - SPRITE_PADDING,
+                                y: SPRITE_TILE_HEIGHT - SPRITE_PADDING,
                             },
                         }),
                         custom_size: Some(Vec2 {
                             x: player_width,
                             y: player_height,
                         }),
-                        color: ev.team.color(),
                         ..Default::default()
                     },
 
@@ -759,8 +766,8 @@ fn spawn_players(
                 Name::new("Player"),
                 InputManagerBundle::with_map(input_map),
                 match ev.team {
-                    Team::Red => Direction::Left,
-                    Team::Blue => Direction::Right,
+                    Team::Yellow => Direction::Left,
+                    Team::Purple => Direction::Right,
                 },
                 ev.team,
                 (
@@ -784,26 +791,6 @@ fn spawn_players(
             if ev.is_queen {
                 player.insert(Wings);
                 player.insert(Queen);
-
-                player.with_children(|children| {
-                    let crown_texture: Handle<Image> = server.load("crown.png");
-                    children.spawn((
-                        SpriteBundle {
-                            sprite: Sprite {
-                                custom_size: Some(Vec2::splat(player_width * 1.5)),
-                                ..Default::default()
-                            },
-                            transform: Transform::from_translation(Vec3 {
-                                x: 0.0,
-                                y: player_height / 2.0,
-                                z: 1.0,
-                            }),
-                            texture: crown_texture,
-                            ..Default::default()
-                        },
-                        Crown,
-                    ));
-                });
             }
             if ev.start_invincible {
                 player.insert(Invincible {

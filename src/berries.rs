@@ -30,8 +30,8 @@ impl Plugin for BerriesPlugin {
 
 #[derive(Default, Resource)]
 pub struct BerriesCollected {
-    red_berries: i32,
-    blue_berries: i32,
+    yellow_berries: i32,
+    purple_berries: i32,
 }
 
 #[derive(Component)]
@@ -136,6 +136,22 @@ fn spawn_berry_bunch(x: f32, y: f32, commands: &mut Commands, asset_server: &Res
             asset_server,
         ))
         .insert(Sensor);
+    let texture = asset_server.load("flower.png");
+    commands.spawn(SpriteBundle {
+        texture,
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(
+                BERRY_RENDER_RADIUS * 8.0,
+                BERRY_RENDER_RADIUS * 7.0 / 4.0,
+            )),
+            ..Default::default()
+        },
+        transform: Transform {
+            translation: Vec3::new(x, y - 1.8 * BERRY_RENDER_RADIUS, 1.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -177,12 +193,12 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         spawn_berry_bunch(x, y, &mut commands, &asset_server)
     }
 
-    for team in [Team::Red, Team::Blue] {
+    for team in [Team::Yellow, Team::Purple] {
         for x in -2..0 {
             for y in 0..3 {
                 let sign = match team {
-                    Team::Red => -1.0,
-                    Team::Blue => 1.0,
+                    Team::Yellow => -1.0,
+                    Team::Purple => 1.0,
                 };
                 commands.spawn(BerryCellBundle::new(
                     (WINDOW_WIDTH / 20.0 + x as f32 * BERRY_RENDER_RADIUS * 2.1) * sign,
@@ -255,8 +271,8 @@ fn put_berries_in_cells(
                         }
                         if berry_cell_team == player_team {
                             match player_team {
-                                Team::Red => berries_collected.red_berries += 1,
-                                Team::Blue => berries_collected.blue_berries += 1,
+                                Team::Yellow => berries_collected.yellow_berries += 1,
+                                Team::Purple => berries_collected.purple_berries += 1,
                             };
                             commands
                                 .entity(player)
@@ -282,23 +298,23 @@ fn check_for_berry_win(
     berries_collected: Res<BerriesCollected>,
 ) {
     let win_condition = WinCondition::Economic;
-    if berries_collected.red_berries >= BERRIES_TO_WIN {
+    if berries_collected.yellow_berries >= BERRIES_TO_WIN {
         ev_win.send(WinEvent {
-            team: Team::Red,
+            team: Team::Yellow,
             win_condition,
         });
     }
-    if berries_collected.blue_berries >= BERRIES_TO_WIN {
+    if berries_collected.purple_berries >= BERRIES_TO_WIN {
         ev_win.send(WinEvent {
-            team: Team::Blue,
+            team: Team::Purple,
             win_condition,
         });
     }
 }
 
 fn reset_berries_collected(mut berries_collected: ResMut<BerriesCollected>) {
-    berries_collected.red_berries = 0;
-    berries_collected.blue_berries = 0;
+    berries_collected.yellow_berries = 0;
+    berries_collected.purple_berries = 0;
 }
 
 fn remove_berries_and_berry_cells(

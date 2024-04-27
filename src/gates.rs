@@ -5,7 +5,7 @@ use bevy_rapier2d::prelude::*;
 use crate::{
     berries::Berry,
     player::{
-        Crown, Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RENDER_HEIGHT,
+        Player, Queen, Team, Wings, PLAYER_COLLIDER_WIDTH_MULTIPLIER, QUEEN_RENDER_HEIGHT,
         QUEEN_RENDER_WIDTH, WORKER_RENDER_HEIGHT, WORKER_RENDER_WIDTH,
     },
     GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
@@ -153,11 +153,15 @@ fn check_worker_gate_collisions(
 
 fn progress_gate_timers(
     mut commands: Commands,
-    mut players_with_gate_timers: Query<((Entity, &mut Sprite, &mut Transform), &mut GateTimer)>,
+    mut players_with_gate_timers: Query<(
+        (Entity, &mut Sprite, &mut Transform, &Team),
+        &mut GateTimer,
+    )>,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
 ) {
-    for ((entity, mut sprite, mut transform), mut gate_timer) in players_with_gate_timers.iter_mut()
+    for ((entity, mut sprite, mut transform, team), mut gate_timer) in
+        players_with_gate_timers.iter_mut()
     {
         gate_timer.timer.tick(time.delta());
 
@@ -178,26 +182,11 @@ fn progress_gate_timers(
                     player_width / 2.0 * PLAYER_COLLIDER_WIDTH_MULTIPLIER,
                     player_height / 2.0,
                 ))
-                .despawn_descendants()
-                .with_children(|children| {
-                    let crown_texture: Handle<Image> = asset_server.load("fighter-crown.png");
-                    children.spawn((
-                        SpriteBundle {
-                            sprite: Sprite {
-                                custom_size: Some(Vec2::splat(player_width * 0.8)),
-                                ..Default::default()
-                            },
-                            transform: Transform::from_translation(Vec3 {
-                                x: 0.0,
-                                y: player_height / 2.0,
-                                z: 1.0,
-                            }),
-                            texture: crown_texture,
-                            ..Default::default()
-                        },
-                        Crown,
-                    ));
-                });
+                .despawn_descendants();
+            commands.entity(entity).insert(match team {
+                Team::Yellow => asset_server.load::<Image>("spritesheets/fighterYellow.png"),
+                Team::Purple => asset_server.load::<Image>("spritesheets/fighterPurple.png"),
+            });
         } else {
             // grow sprite
             let percent_done = gate_timer.timer.elapsed_secs() / GATE_TIME;

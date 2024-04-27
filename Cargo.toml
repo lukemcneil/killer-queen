@@ -10,7 +10,7 @@ rand = "0.8.5"
 bevy = "0.13.2"
 bevy_rapier2d = "0.25.0"
 leafwing-input-manager = { git = "https://github.com/Leafwing-Studios/leafwing-input-manager.git" }
-bevy-inspector-egui = "0.23.4"
+bevy-inspector-egui = "0.24.0"
 iyes_perf_ui = "0.2.3"
 
 [profile.dev]

@@ -122,9 +122,9 @@ fn join(
             let team = if button_inputs
                 .just_pressed(GamepadButton::new(gamepad, GamepadButtonType::LeftTrigger))
             {
-                Team::Red
+                Team::Yellow
             } else {
-                Team::Blue
+                Team::Purple
             };
             let is_queen = !queens.iter().any(|&queen_team| queen_team == team);
 
