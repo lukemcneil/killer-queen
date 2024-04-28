@@ -58,7 +58,7 @@ impl BerryBundle {
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(x, y, -1.0),
+                    translation: Vec3::new(x, y, -5.0),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -90,7 +90,7 @@ impl BerryCellBundle {
             sprite_bundle: SpriteBundle {
                 texture,
                 sprite: Sprite {
-                    custom_size: Some(Vec2::splat(BERRY_RENDER_RADIUS * 2.0)),
+                    custom_size: Some(Vec2::splat(BERRY_RENDER_RADIUS)),
                     color: team.color(),
                     ..Default::default()
                 },
@@ -280,6 +280,8 @@ fn put_berries_in_cells(
                                 .despawn_descendants();
                             let berry_texture: Handle<Image> = asset_server.load("berry.png");
                             berry_cell_sprite.color = Color::WHITE;
+                            berry_cell_sprite.custom_size =
+                                Some(Vec2::splat(BERRY_RENDER_RADIUS * 2.0));
                             commands
                                 .entity(berry_cell)
                                 .insert(Berry)

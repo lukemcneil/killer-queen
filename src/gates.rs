@@ -17,6 +17,10 @@ const GATE_WIDTH: f32 = WORKER_RENDER_WIDTH * 1.2;
 pub const GATE_HEIGHT: f32 = WORKER_RENDER_HEIGHT * 1.5;
 const GATE_TIME: f32 = 1.0;
 
+const GATE_NEUTRAL_IDX: usize = 2;
+const GATE_YELLOW_IDX: usize = 0;
+const GATE_PURPLE_IDX: usize = 1;
+
 impl Plugin for GatePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::Join), setup)
@@ -31,24 +35,35 @@ pub struct Gate;
 #[derive(Bundle)]
 pub struct GateBundle {
     gate: Gate,
-    sprite_bundle: SpriteBundle,
+    sprite_sheet_bundle: SpriteSheetBundle,
     collider: Collider,
     sensor: Sensor,
 }
 
 impl GateBundle {
-    pub fn new(x: f32, y: f32, asset_server: &Res<AssetServer>) -> Self {
-        let texture = asset_server.load("gate.png");
+    pub fn new(
+        x: f32,
+        y: f32,
+        asset_server: &Res<AssetServer>,
+        atlases: &mut ResMut<Assets<TextureAtlasLayout>>,
+    ) -> Self {
+        let texture: Handle<Image> = asset_server.load("gates.png");
+        let texture_atlas = TextureAtlasLayout::from_grid(Vec2::new(32.0, 32.0), 3, 1, None, None);
+        let atlas_handle = atlases.add(texture_atlas);
         Self {
             gate: Gate,
-            sprite_bundle: SpriteBundle {
+            sprite_sheet_bundle: SpriteSheetBundle {
                 texture,
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(GATE_WIDTH, GATE_HEIGHT)),
-                    ..Default::default()
+                atlas: TextureAtlas {
+                    layout: atlas_handle,
+                    index: GATE_NEUTRAL_IDX,
                 },
                 transform: Transform {
                     translation: Vec3::new(x, y, -11.0),
+                    ..Default::default()
+                },
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(GATE_WIDTH, GATE_HEIGHT)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -59,31 +74,40 @@ impl GateBundle {
     }
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut atlases: ResMut<Assets<TextureAtlasLayout>>,
+) {
     commands.spawn(GateBundle::new(
         0.0,
         WINDOW_BOTTOM_Y + 4.0 * WINDOW_HEIGHT / 9.0 + GATE_HEIGHT / 2.0,
         &asset_server,
+        &mut atlases,
     ));
     commands.spawn(GateBundle::new(
         WINDOW_RIGHT_X - WINDOW_WIDTH / 3.2,
         WINDOW_BOTTOM_Y + 2.0 * WINDOW_HEIGHT / 9.0 + GATE_HEIGHT / 2.0,
         &asset_server,
+        &mut atlases,
     ));
     commands.spawn(GateBundle::new(
         -(WINDOW_RIGHT_X - WINDOW_WIDTH / 3.2),
         WINDOW_BOTTOM_Y + 2.0 * WINDOW_HEIGHT / 9.0 + GATE_HEIGHT / 2.0,
         &asset_server,
+        &mut atlases,
     ));
     commands.spawn(GateBundle::new(
         WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0,
         WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0 + GATE_HEIGHT / 2.0,
         &asset_server,
+        &mut atlases,
     ));
     commands.spawn(GateBundle::new(
         -(WINDOW_RIGHT_X - WINDOW_WIDTH / 5.0),
         WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0 + GATE_HEIGHT / 2.0,
         &asset_server,
+        &mut atlases,
     ));
 }
 
@@ -97,7 +121,7 @@ fn check_worker_gate_collisions(
         (Has<GateTimer>, Has<Berry>, Has<Queen>, &Team, &mut Sprite),
         With<Player>,
     >,
-    mut gates: Query<(Option<&Team>, &mut Sprite), (With<Gate>, Without<Player>)>,
+    mut gates: Query<(Option<&Team>, &mut TextureAtlas), (With<Gate>, Without<Player>)>,
     mut collision_events: EventReader<CollisionEvent>,
     mut commands: Commands,
 ) {
@@ -111,7 +135,10 @@ fn check_worker_gate_collisions(
                         {
                             if is_queen {
                                 commands.entity(*gate_entity).insert(*team);
-                                gate_sprite.color = team.color();
+                                gate_sprite.index = match team {
+                                    Team::Yellow => GATE_YELLOW_IDX,
+                                    Team::Purple => GATE_PURPLE_IDX,
+                                };
                             }
                             if let Some(gate_team) = maybe_gate_team {
                                 if gate_team != team {

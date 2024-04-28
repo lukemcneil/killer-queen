@@ -135,8 +135,8 @@ pub enum Team {
 impl Team {
     pub fn color(&self) -> Color {
         match self {
-            Team::Yellow => Color::ORANGE,
-            Team::Purple => Color::PURPLE,
+            Team::Yellow => Color::rgb(1.0, 0.773, 0.0),
+            Team::Purple => Color::rgb(0.435, 0.0, 1.0),
         }
     }
 }

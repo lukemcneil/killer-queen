@@ -47,7 +47,11 @@ pub struct TempPlatform;
 #[derive(Component)]
 pub struct JoinGate;
 
-fn setup_join(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup_join(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut atlases: ResMut<Assets<TextureAtlasLayout>>,
+) {
     for sign in [-1.0, 1.0] {
         commands.spawn((
             PlatformBundle::new(
@@ -86,6 +90,7 @@ fn setup_join(mut commands: Commands, asset_server: Res<AssetServer>) {
                 (WINDOW_RIGHT_X - WINDOW_WIDTH / 3.2) * sign,
                 WINDOW_BOTTOM_Y + 8.0 * WINDOW_HEIGHT / 9.0 + GATE_HEIGHT / 2.0,
                 &asset_server,
+                &mut atlases,
             ),
             JoinGate,
         ));
