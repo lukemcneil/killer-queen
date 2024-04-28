@@ -3,7 +3,6 @@ use bevy_rapier2d::prelude::*;
 
 use crate::{WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH};
 
-const PLATFORM_COLOR: Color = Color::rgb(0.29, 0.31, 0.41);
 pub const PLATFORM_HEIGHT: f32 = 20.0;
 
 #[derive(Bundle)]
@@ -11,25 +10,40 @@ pub struct PlatformBundle {
     sprite_bundle: SpriteBundle,
     body: RigidBody,
     collider: Collider,
+    image_scale_mode: ImageScaleMode,
 }
 
 impl PlatformBundle {
-    pub fn new(x: f32, y: f32, scale: Vec3, color: Option<Color>) -> Self {
+    pub fn new(
+        x: f32,
+        y: f32,
+        scale: Vec3,
+        is_floor: bool,
+        color: Option<Color>,
+        asset_server: &Res<AssetServer>,
+    ) -> Self {
+        let texture = asset_server.load("ground.png");
         Self {
             sprite_bundle: SpriteBundle {
-                sprite: Sprite {
-                    color: color.unwrap_or(PLATFORM_COLOR),
-                    ..Default::default()
-                },
                 transform: Transform {
                     translation: Vec3::new(x, y, -10.0),
-                    scale,
                     ..Default::default()
                 },
+                sprite: Sprite {
+                    color: color.unwrap_or(Color::WHITE),
+                    custom_size: Some(scale.truncate()),
+                    ..Default::default()
+                },
+                texture,
                 ..Default::default()
             },
             body: RigidBody::Fixed,
-            collider: Collider::cuboid(0.5, 0.5),
+            collider: Collider::cuboid(scale.x / 2.0, scale.y / 2.0),
+            image_scale_mode: ImageScaleMode::Tiled {
+                tile_x: is_floor,
+                tile_y: !is_floor,
+                stretch_value: 1.0,
+            },
         }
     }
 }
@@ -42,7 +56,7 @@ impl Plugin for PlatformsPlugin {
     }
 }
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     for sign in [1.0, -1.0] {
         for (x, y, width) in [
             // layer 0
@@ -142,7 +156,9 @@ fn setup(mut commands: Commands) {
                 x * sign,
                 y,
                 Vec3::new(width, PLATFORM_HEIGHT, 1.0),
+                true,
                 None,
+                &asset_server,
             ));
         }
     }
@@ -164,7 +180,9 @@ fn setup(mut commands: Commands) {
             0.0,
             y,
             Vec3::new(width, PLATFORM_HEIGHT, 1.0),
+            true,
             None,
+            &asset_server,
         ));
     }
     // divider
@@ -172,14 +190,18 @@ fn setup(mut commands: Commands) {
         0.0,
         WINDOW_BOTTOM_Y + 8.0 * WINDOW_HEIGHT / 9.0,
         Vec3::new(PLATFORM_HEIGHT, 2.0 * WINDOW_HEIGHT / 9.0, 1.0),
+        false,
         None,
+        &asset_server,
     ));
     for sign in [-1.0, 1.0] {
         commands.spawn(PlatformBundle::new(
             WINDOW_RIGHT_X * sign,
             WINDOW_BOTTOM_Y + 7.0 * WINDOW_HEIGHT / 9.0,
             Vec3::new(PLATFORM_HEIGHT, 4.0 * WINDOW_HEIGHT / 9.0, 1.0),
+            false,
             None,
+            &asset_server,
         ));
     }
 }

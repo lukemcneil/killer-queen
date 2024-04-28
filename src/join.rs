@@ -64,7 +64,9 @@ fn setup_join(
                     PLATFORM_HEIGHT / 4.0,
                     1.0,
                 ),
+                true,
                 Some(TEMP_PLATFORM_COLOR),
+                &asset_server,
             ),
             TempPlatform,
         ));
@@ -80,7 +82,9 @@ fn setup_join(
                     PLATFORM_HEIGHT / 4.0,
                     1.0,
                 ),
+                true,
                 Some(TEMP_PLATFORM_COLOR),
+                &asset_server,
             ),
             TempPlatform,
         ));

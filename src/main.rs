@@ -76,7 +76,7 @@ enum GameState {
     GameOver,
 }
 
-fn setup(mut commands: Commands) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         PerfUiRoot {
             display_labels: false,
@@ -91,6 +91,15 @@ fn setup(mut commands: Commands) {
         max_height: WINDOW_HEIGHT,
     };
     commands.spawn(camera);
+    commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(WINDOW_WIDTH, WINDOW_HEIGHT)),
+            ..Default::default()
+        },
+        texture: asset_server.load("background.png"),
+        transform: Transform::from_xyz(0.0, 0.0, -100.0),
+        ..Default::default()
+    });
 }
 
 #[derive(Debug, Clone, Copy)]
