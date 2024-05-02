@@ -28,7 +28,7 @@ pub const WINDOW_LEFT_X: f32 = WINDOW_WIDTH / -2.0;
 pub const WINDOW_TOP_Y: f32 = WINDOW_HEIGHT / 2.0;
 pub const WINDOW_RIGHT_X: f32 = WINDOW_WIDTH / 2.0;
 
-const COLOR_BACKGROUND: Color = Color::rgb(0.5, 0.5, 0.5);
+const COLOR_BACKGROUND: Color = Color::rgb(0.298, 0.737, 0.937);
 
 fn main() {
     App::new()
@@ -76,7 +76,7 @@ enum GameState {
     GameOver,
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands) {
     commands.spawn((
         PerfUiRoot {
             display_labels: false,
@@ -91,15 +91,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         max_height: WINDOW_HEIGHT,
     };
     commands.spawn(camera);
-    commands.spawn(SpriteBundle {
-        sprite: Sprite {
-            custom_size: Some(Vec2::new(WINDOW_WIDTH, WINDOW_HEIGHT)),
-            ..Default::default()
-        },
-        texture: asset_server.load("background.png"),
-        transform: Transform::from_xyz(0.0, 0.0, -100.0),
-        ..Default::default()
-    });
 }
 
 #[derive(Debug, Clone, Copy)]
