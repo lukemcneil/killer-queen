@@ -7,6 +7,7 @@ use crate::{
         Action, Direction, KnockBackEvent, Player, Team, Wings, PLAYER_JUMP_IMPULSE,
         WORKER_RENDER_HEIGHT,
     },
+    settings::GameSettings,
     GameState, WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_WIDTH,
 };
 
@@ -14,7 +15,6 @@ pub struct ShipPlugin;
 
 const SHIP_WIDTH: f32 = 124.0 / 2.0;
 const SHIP_HEIGHT: f32 = 67.0 / 2.0;
-const SHIP_SPEED: f32 = 20.0;
 const SHIP_WIN_SPOT: f32 = WINDOW_WIDTH / 2.0 - WINDOW_WIDTH / 18.0;
 const SHIP_WIN_SPOT_WIDTH: f32 = 50.0;
 
@@ -134,6 +134,7 @@ fn move_ship(
     mut workers_on_ships: Query<(&mut Transform, &RidingOnShip), Without<Ship>>,
     mut ships: Query<(&Team, &mut Transform), With<Ship>>,
     time: Res<Time>,
+    game_settings: Res<GameSettings>,
 ) {
     for (mut worker_transform, riding_on_ship) in workers_on_ships.iter_mut() {
         let (team, mut ship_transform) = ships.get_mut(riding_on_ship.ship).unwrap();
@@ -141,7 +142,7 @@ fn move_ship(
             Team::Yellow => -1.0,
             Team::Purple => 1.0,
         };
-        ship_transform.translation.x += direction * SHIP_SPEED * time.delta_seconds();
+        ship_transform.translation.x += direction * game_settings.ship_speed * time.delta_seconds();
         worker_transform.translation = ship_transform.translation;
         worker_transform.translation.y += WORKER_RENDER_HEIGHT / 2.0 + SHIP_HEIGHT / 2.0;
     }

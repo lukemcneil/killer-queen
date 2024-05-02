@@ -5,9 +5,9 @@ use bevy_rapier2d::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::{
-    animation::Animation, berries::Berry, join::remove_player, ship::RidingOnShip, GameState,
-    WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_LEFT_X, WINDOW_RIGHT_X,
-    WINDOW_TOP_Y, WINDOW_WIDTH,
+    animation::Animation, berries::Berry, join::remove_player, settings::GameSettings,
+    ship::RidingOnShip, GameState, WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT,
+    WINDOW_LEFT_X, WINDOW_RIGHT_X, WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const PLAYER_MAX_VELOCITY_X: f32 = 600.0;
@@ -200,14 +200,16 @@ fn reset_queen_lives_counter(mut queen_deaths: ResMut<QueenDeaths>) {
 fn update_queen_lives_counter(
     mut counters: Query<(&mut Text, &Team)>,
     queen_deaths: Res<QueenDeaths>,
+    game_settings: Res<GameSettings>,
 ) {
     for (mut counter_text, counter_team) in counters.iter_mut() {
         counter_text.sections[0].value = format!(
             "Lives: {}",
-            3 - match counter_team {
-                Team::Yellow => queen_deaths.yellow_deaths,
-                Team::Purple => queen_deaths.purple_deaths,
-            }
+            game_settings.queen_lives
+                - match counter_team {
+                    Team::Yellow => queen_deaths.yellow_deaths,
+                    Team::Purple => queen_deaths.purple_deaths,
+                }
         )
     }
 }
@@ -629,15 +631,19 @@ fn check_if_players_on_ground(
     }
 }
 
-fn check_for_queen_death_win(mut ev_win: EventWriter<WinEvent>, queen_deaths: Res<QueenDeaths>) {
+fn check_for_queen_death_win(
+    mut ev_win: EventWriter<WinEvent>,
+    queen_deaths: Res<QueenDeaths>,
+    game_settings: Res<GameSettings>,
+) {
     let win_condition = WinCondition::Military;
-    if queen_deaths.yellow_deaths >= 3 {
+    if queen_deaths.yellow_deaths >= game_settings.queen_lives {
         ev_win.send(WinEvent {
             team: Team::Purple,
             win_condition,
         });
     }
-    if queen_deaths.purple_deaths >= 3 {
+    if queen_deaths.purple_deaths >= game_settings.queen_lives {
         ev_win.send(WinEvent {
             team: Team::Yellow,
             win_condition,

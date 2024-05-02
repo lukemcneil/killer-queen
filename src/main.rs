@@ -6,11 +6,13 @@ mod gates;
 mod join;
 mod platforms;
 mod player;
+mod settings;
 mod ship;
 
 use animation::AnimationPlugin;
 use berries::BerriesPlugin;
 use bevy::{prelude::*, render::camera::ScalingMode, window::WindowResolution};
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 use gates::GatePlugin;
@@ -18,6 +20,7 @@ use iyes_perf_ui::{diagnostics::PerfUiEntryFPS, PerfUiPlugin, PerfUiRoot};
 use join::JoinPlugin;
 use platforms::PlatformsPlugin;
 use player::{PlayerPlugin, Team};
+use settings::SettingsPlugin;
 use ship::ShipPlugin;
 
 const WINDOW_WIDTH: f32 = 1920.0;
@@ -57,9 +60,11 @@ fn main() {
             ShipPlugin,
             GatePlugin,
             JoinPlugin,
+            SettingsPlugin,
         ))
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(PerfUiPlugin)
+        .add_plugins(EguiPlugin)
         // .add_plugins(WorldInspectorPlugin::new())
         .add_event::<WinEvent>()
         .add_systems(Startup, setup)

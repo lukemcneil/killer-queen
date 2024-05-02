@@ -4,26 +4,28 @@ use bevy_rapier2d::prelude::*;
 use crate::{
     platforms::PLATFORM_HEIGHT,
     player::{Player, Team, Wings, WORKER_RENDER_WIDTH},
+    settings::GameSettings,
     GameState, WinCondition, WinEvent, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X,
     WINDOW_TOP_Y, WINDOW_WIDTH,
 };
 
 const BERRY_RENDER_RADIUS: f32 = 12.0;
-const BERRIES_TO_WIN: i32 = 6;
 
 pub struct BerriesPlugin;
 
 impl Plugin for BerriesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BerriesCollected>()
+            .add_event::<RespawnBerriesEvent>()
             .add_systems(OnEnter(GameState::Join), setup)
             .add_systems(
                 Update,
-                (grab_berries, put_berries_in_cells, check_for_berry_win),
-            )
-            .add_systems(
-                OnExit(GameState::GameOver),
-                (remove_berries_and_berry_cells, reset_berries_collected),
+                (
+                    grab_berries,
+                    put_berries_in_cells,
+                    check_for_berry_win,
+                    handle_respawn_berries_event,
+                ),
             );
     }
 }
@@ -154,7 +156,42 @@ fn spawn_berry_bunch(x: f32, y: f32, commands: &mut Commands, asset_server: &Res
         .insert(Sensor);
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+#[derive(Event)]
+pub struct RespawnBerriesEvent;
+
+fn setup(mut respawn_berries_ev: EventWriter<RespawnBerriesEvent>) {
+    respawn_berries_ev.send(RespawnBerriesEvent);
+}
+
+fn handle_respawn_berries_event(
+    respawn_berries_ev: EventReader<RespawnBerriesEvent>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    game_settings: Res<GameSettings>,
+    mut berries_collected: ResMut<BerriesCollected>,
+    berries: Query<
+        Entity,
+        (
+            With<Berry>,
+            Without<BerryCell>,
+            Without<Player>,
+            Without<Parent>, // do not remove berries held by players
+        ),
+    >,
+    berry_cells: Query<Entity, With<BerryCell>>,
+) {
+    if respawn_berries_ev.is_empty() {
+        return;
+    }
+    berries_collected.yellow_berries = 0;
+    berries_collected.purple_berries = 0;
+    for berry in &berries {
+        commands.entity(berry).despawn();
+    }
+    for berry_cell in &berry_cells {
+        commands.entity(berry_cell).despawn();
+    }
+
     for (x, y) in [
         // layer 0
         (
@@ -194,8 +231,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     for team in [Team::Yellow, Team::Purple] {
-        for x in -2..0 {
-            for y in 0..3 {
+        let mut cells_placed = 0;
+        'outer: for x in -2..100 {
+            for y in (0..3).rev() {
                 let sign = match team {
                     Team::Yellow => -1.0,
                     Team::Purple => 1.0,
@@ -206,6 +244,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                     team,
                     &asset_server,
                 ));
+                cells_placed += 1;
+                if cells_placed >= game_settings.berries_to_win {
+                    break 'outer;
+                }
             }
         }
     }
@@ -298,36 +340,19 @@ fn put_berries_in_cells(
 fn check_for_berry_win(
     mut ev_win: EventWriter<WinEvent>,
     berries_collected: Res<BerriesCollected>,
+    game_settings: Res<GameSettings>,
 ) {
     let win_condition = WinCondition::Economic;
-    if berries_collected.yellow_berries >= BERRIES_TO_WIN {
+    if berries_collected.yellow_berries >= game_settings.berries_to_win {
         ev_win.send(WinEvent {
             team: Team::Yellow,
             win_condition,
         });
     }
-    if berries_collected.purple_berries >= BERRIES_TO_WIN {
+    if berries_collected.purple_berries >= game_settings.berries_to_win {
         ev_win.send(WinEvent {
             team: Team::Purple,
             win_condition,
         });
-    }
-}
-
-fn reset_berries_collected(mut berries_collected: ResMut<BerriesCollected>) {
-    berries_collected.yellow_berries = 0;
-    berries_collected.purple_berries = 0;
-}
-
-fn remove_berries_and_berry_cells(
-    berries: Query<Entity, (With<Berry>, Without<BerryCell>, Without<Player>)>,
-    berry_cells: Query<Entity, With<BerryCell>>,
-    mut commands: Commands,
-) {
-    for berry in &berries {
-        commands.entity(berry).despawn();
-    }
-    for berry_cell in &berry_cells {
-        commands.entity(berry_cell).despawn();
     }
 }
