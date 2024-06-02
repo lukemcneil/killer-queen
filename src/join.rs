@@ -4,9 +4,9 @@ use leafwing_input_manager::action_state::ActionState;
 
 use crate::{
     berries::{Berry, BerryBundle},
-    gates::{GateBundle, GATE_HEIGHT},
+    gates::{GateBundle, GATE_HEIGHT, GATE_NEUTRAL_IDX},
     platforms::{PlatformBundle, PLATFORM_HEIGHT},
-    player::{Action, Player, Queen, SpawnPlayerEvent, Team},
+    player::{Action, Player, PlayerController, Queen, SpawnPlayerEvent, Team},
     ship::RidingOnShip,
     GameState, WINDOW_BOTTOM_Y, WINDOW_HEIGHT, WINDOW_RIGHT_X, WINDOW_WIDTH,
 };
@@ -142,7 +142,7 @@ fn join(
                 ev_spawn_players.send(SpawnPlayerEvent {
                     team,
                     is_queen,
-                    gamepad,
+                    player_controller: PlayerController::Gamepad(gamepad),
                     delay: 0.0,
                     start_invincible: false,
                 });
@@ -168,7 +168,7 @@ fn disconnect(
     )>,
     mut joined_gamepads: ResMut<JoinedGamepads>,
     asset_server: Res<AssetServer>,
-    mut join_gates: Query<(Entity, &Team, &mut Sprite), With<JoinGate>>,
+    mut join_gates: Query<(Entity, &Team, &mut TextureAtlas), With<JoinGate>>,
 ) {
     for (
         player_entity,
@@ -182,7 +182,9 @@ fn disconnect(
     ) in action_query.iter()
     {
         if action_state.pressed(&Action::Disconnect) {
-            joined_gamepads.0.remove(&player.gamepad);
+            if let PlayerController::Gamepad(gamepad) = player.player_controller {
+                joined_gamepads.0.remove(&gamepad);
+            }
             remove_player(
                 &mut commands,
                 player_entity,
@@ -195,7 +197,7 @@ fn disconnect(
                 for (join_gate, join_gate_team, mut gate_sprite) in join_gates.iter_mut() {
                     if join_gate_team == team {
                         commands.entity(join_gate).remove::<Team>();
-                        gate_sprite.color = Color::WHITE;
+                        gate_sprite.index = GATE_NEUTRAL_IDX;
                     }
                 }
             }

@@ -156,10 +156,16 @@ pub struct QueenDeaths {
     purple_deaths: i32,
 }
 
+#[derive(Clone, Copy, Debug, Component)]
+pub enum PlayerController {
+    Gamepad(Gamepad),
+    Midi { octave: u8 },
+}
+
 #[derive(Component)]
 pub struct Player {
     // This gamepad is used to index each player
-    pub gamepad: Gamepad,
+    pub player_controller: PlayerController,
     pub is_on_ground: bool,
 }
 
@@ -407,7 +413,7 @@ pub struct KnockBackEvent {
 pub struct SpawnPlayerEvent {
     pub team: Team,
     pub is_queen: bool,
-    pub gamepad: Gamepad,
+    pub player_controller: PlayerController,
     pub delay: f32,
     pub start_invincible: bool,
 }
@@ -583,7 +589,7 @@ fn players_attack(
                     ev_spawn_players.send(SpawnPlayerEvent {
                         team: killed_player_team,
                         is_queen: killed_player_is_queen,
-                        gamepad: killed_player.gamepad,
+                        player_controller: killed_player.player_controller,
                         delay: RESPAWN_DELAY,
                         start_invincible: true,
                     });
@@ -719,21 +725,23 @@ fn spawn_players(
             let atlas_handle = atlases.add(texture_atlas);
 
             let mut input_map = InputMap::default();
-            input_map.insert(Action::Jump, GamepadButtonType::South);
-            input_map.insert(
-                Action::Move,
-                SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
-            );
-            input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
-            input_map.insert(Action::Disconnect, GamepadButtonType::Select);
-            if ev.is_queen {
+            if let PlayerController::Gamepad(gamepad) = ev.player_controller {
+                input_map.insert(Action::Jump, GamepadButtonType::South);
                 input_map.insert(
-                    Action::Dive,
-                    SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.9),
+                    Action::Move,
+                    SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.5),
                 );
-                input_map.insert(Action::Dive, GamepadButtonType::DPadDown);
+                input_map.insert(Action::Move, VirtualAxis::horizontal_dpad());
+                input_map.insert(Action::Disconnect, GamepadButtonType::Select);
+                if ev.is_queen {
+                    input_map.insert(
+                        Action::Dive,
+                        SingleAxis::negative_only(GamepadAxisType::LeftStickY, -0.9),
+                    );
+                    input_map.insert(Action::Dive, GamepadButtonType::DPadDown);
+                }
+                input_map.set_gamepad(gamepad);
             }
-            input_map.set_gamepad(ev.gamepad);
 
             let (player_width, player_height) = if ev.is_queen {
                 (QUEEN_RENDER_WIDTH, QUEEN_RENDER_HEIGHT)
@@ -771,11 +779,12 @@ fn spawn_players(
                     ..Default::default()
                 },
                 Player {
-                    gamepad: ev.gamepad,
+                    player_controller: ev.player_controller,
                     is_on_ground: false,
                 },
                 Name::new("Player"),
                 InputManagerBundle::with_map(input_map),
+                ev.player_controller,
                 match ev.team {
                     Team::Yellow => Direction::Left,
                     Team::Purple => Direction::Right,
@@ -848,7 +857,7 @@ fn reset_all_players(
         ev_spawn_players.send(SpawnPlayerEvent {
             team,
             is_queen,
-            gamepad: player.gamepad,
+            player_controller: player.player_controller,
             delay: 0.0,
             start_invincible: false,
         });
