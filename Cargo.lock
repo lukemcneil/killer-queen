@@ -847,6 +847,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< Updated upstream
 name = "bevy_platformer"
 version = "0.1.0"
 dependencies = [
@@ -860,6 +861,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> Stashed changes
 name = "bevy_ptr"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2529,6 +2532,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "killer_queen"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-inspector-egui",
+ "bevy_midi",
+ "bevy_rapier2d",
+ "iyes_perf_ui",
+ "leafwing-input-manager",
+ "rand",
+]
+
+[[package]]
 name = "ktx2"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2552,7 +2568,7 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 [[package]]
 name = "leafwing-input-manager"
 version = "0.14.0"
-source = "git+https://github.com/Leafwing-Studios/leafwing-input-manager.git#0115ca456321729633be7af51c282d0f47156988"
+source = "git+https://github.com/Leafwing-Studios/leafwing-input-manager.git?rev=0115ca456321729633be7af51c282d0f47156988#0115ca456321729633be7af51c282d0f47156988"
 dependencies = [
  "bevy",
  "derive_more",
@@ -2564,7 +2580,7 @@ dependencies = [
 [[package]]
 name = "leafwing_input_manager_macros"
 version = "0.13.1"
-source = "git+https://github.com/Leafwing-Studios/leafwing-input-manager.git#0115ca456321729633be7af51c282d0f47156988"
+source = "git+https://github.com/Leafwing-Studios/leafwing-input-manager.git?rev=0115ca456321729633be7af51c282d0f47156988#0115ca456321729633be7af51c282d0f47156988"
 dependencies = [
  "proc-macro-crate 3.1.0",
  "proc-macro2",
