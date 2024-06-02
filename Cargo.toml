@@ -12,7 +12,7 @@ bevy_rapier2d = "0.25.0"
 leafwing-input-manager = { git = "https://github.com/Leafwing-Studios/leafwing-input-manager.git", rev = "0115ca456321729633be7af51c282d0f47156988" }
 bevy-inspector-egui = "0.23.4"
 iyes_perf_ui = "0.2.3"
-bevy_midi = { path = "../bevy_midi" }
+bevy_midi = { git = "https://github.com/lukemcneil/bevy_midi" }
 
 [profile.dev]
 opt-level = 1
