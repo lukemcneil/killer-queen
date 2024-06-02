@@ -4,6 +4,7 @@ mod animation;
 mod berries;
 mod gates;
 mod join;
+#[cfg(feature = "bevy_midi")]
 mod midi;
 mod platforms;
 mod player;
@@ -19,6 +20,7 @@ use bevy_rapier2d::prelude::*;
 use gates::GatePlugin;
 use iyes_perf_ui::{diagnostics::PerfUiEntryFPS, PerfUiPlugin, PerfUiRoot};
 use join::JoinPlugin;
+#[cfg(feature = "bevy_midi")]
 use midi::MidiPlugin;
 use platforms::PlatformsPlugin;
 use player::{PlayerPlugin, Team};
@@ -63,6 +65,7 @@ fn main() {
             GatePlugin,
             JoinPlugin,
             SettingsPlugin,
+            #[cfg(feature = "bevy_midi")]
             MidiPlugin,
         ))
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
