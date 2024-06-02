@@ -9,7 +9,7 @@ impl Plugin for SettingsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            show_game_settings.run_if(input_toggle_active(true, KeyCode::Escape)),
+            show_game_settings.run_if(input_toggle_active(false, KeyCode::Escape)),
         )
         .init_resource::<GameSettings>();
     }

@@ -41,7 +41,7 @@ fn main() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        title: "Bevy Platformer".to_string(),
+                        title: "Killer Queen".to_string(),
                         resolution: WindowResolution::new(WINDOW_WIDTH, WINDOW_HEIGHT),
                         resizable: true,
                         ..Default::default()
