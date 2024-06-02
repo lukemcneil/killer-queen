@@ -1,1 +1,121 @@
-<!doctype html><html lang=en><meta charset=utf-8><title>Killer Queen</title><link href=icon.ico rel=icon><style>body,html{height:100%}body{margin:0}.game-container{justify-content:center;align-items:center;width:100%;height:100%;display:flex}#bevy{background-color:#fff;width:800px;height:600px}</style><link crossorigin href=./bevy_platformer-4e1601d3bedd45dc.js integrity=sha384-KBl8UnUXd41qujhSiErIo8DLMEGfdv3N/ei8kn2EMKp0ugA3SGBOxiDMC2XK6Q2K rel=modulepreload><link as=fetch crossorigin href=./bevy_platformer-4e1601d3bedd45dc_bg.wasm integrity=sha384-/xMoVmqUPhC3vRKAkjJzccO1GMP0QTCx5R0/aX3Wo0lv1DbM5jNZHu26RIB1HQuz rel=preload type=application/wasm></head><body><script>(()=>{let d=0;var c=(e=>{let f=d;a.forEach(a=>{if(a.state!==`running`){a.resume()}else{f++}});if(f>d&&f===a.length){b.forEach(a=>{document.removeEventListener(a,c)})}});const a=[];const b=[`click`,`contextmenu`,`auxclick`,`dblclick`,`mousedown`,`mouseup`,`pointerup`,`touchend`,`keydown`,`keyup`];self.AudioContext=new Proxy(self.AudioContext,{construct(b,c){const d=new b(...c);a.push(d);return d}});b.forEach(a=>{document.addEventListener(a,c)})})()</script><div class=game-container><canvas id=bevy>Javascript and support for canvas is required</canvas></div><script type=module>import a,*as b from"./bevy_platformer-4e1601d3bedd45dc.js";a(`./bevy_platformer-4e1601d3bedd45dc_bg.wasm`);window.wasmBindings=b</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <title>Killer Queen</title>
+        
+        
+        <link rel="icon" href="icon.ico">
+        <style>body, html {
+    height: 100%;
+}
+
+body {
+    /* background: repeating-linear-gradient(
+        135deg,
+        black 0,
+        black 2px,
+        white 2px,
+        white 20px
+    ); */
+    margin: 0;
+}
+
+.game-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#bevy {
+    background-color: white;
+    width: 800px;
+    height: 600px;
+}</style>
+    
+<link rel="modulepreload" href="./killer_queen-7331f4421c0837cd.js" crossorigin=anonymous integrity="sha384-MRfPPxkmrtpv5kb+gE1UU56l6bw/Ifh0ZIE6FUEGKTXnOY2eYtIflBTMzyZ5QcWq">
+<link rel="preload" href="./killer_queen-7331f4421c0837cd_bg.wasm" crossorigin=anonymous integrity="sha384-OwbcpQ7hzuTW8m1KQJxT3osL95QefPXSzE5ak/n5nCTqF+bkU1OqhQrglEtRhgdN" as="fetch" type="application/wasm"></head>
+    <body>
+        <script>// Insert hack to make sound autoplay on Chrome as soon as the user interacts with the tab:
+// https://developers.google.com/web/updates/2018/11/web-audio-autoplay#moving-forward
+
+// the following function keeps track of all AudioContexts and resumes them on the first user
+// interaction with the page. If the function is called and all contexts are already running,
+// it will remove itself from all event listeners.
+(function () {
+    // An array of all contexts to resume on the page
+    const audioContextList = [];
+
+    // An array of various user interaction events we should listen for
+    const userInputEventNames = [
+        "click",
+        "contextmenu",
+        "auxclick",
+        "dblclick",
+        "mousedown",
+        "mouseup",
+        "pointerup",
+        "touchend",
+        "keydown",
+        "keyup",
+    ];
+
+    // A proxy object to intercept AudioContexts and
+    // add them to the array for tracking and resuming later
+    self.AudioContext = new Proxy(self.AudioContext, {
+        construct(target, args) {
+            const result = new target(...args);
+            audioContextList.push(result);
+            return result;
+        },
+    });
+
+    // To resume all AudioContexts being tracked
+    function resumeAllContexts(_event) {
+        let count = 0;
+
+        audioContextList.forEach((context) => {
+            if (context.state !== "running") {
+                context.resume();
+            } else {
+                count++;
+            }
+        });
+
+        // If all the AudioContexts have now resumed then we unbind all
+        // the event listeners from the page to prevent unnecessary resume attempts
+        // Checking count > 0 ensures that the user interaction happens AFTER the game started up
+        if (count > 0 && count === audioContextList.length) {
+            userInputEventNames.forEach((eventName) => {
+                document.removeEventListener(eventName, resumeAllContexts);
+            });
+        }
+    }
+
+    // We bind the resume function for each user interaction
+    // event on the page
+    userInputEventNames.forEach((eventName) => {
+        document.addEventListener(eventName, resumeAllContexts);
+    });
+})();
+</script>
+        <div class="game-container">
+            <canvas id="bevy">
+                Javascript and support for canvas is required
+            </canvas>
+        </div>
+    
+<script type="module">
+import init, * as bindings from './killer_queen-7331f4421c0837cd.js';
+const wasm = await init('./killer_queen-7331f4421c0837cd_bg.wasm');
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+</html>
