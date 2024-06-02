@@ -115,10 +115,10 @@ fn handle_keyboard_presses(
                 value = if *pressed_key == 0 { -1.0 } else { 1.0 };
                 action = Action::Move;
             }
-            5 => {
-                value = 1.0;
-                action = Action::Dive;
-            }
+            // 5 => {
+            //     value = 1.0;
+            //     action = Action::Dive;
+            // }
             _ => (),
         }
         for (mut action_state, player_controller) in &mut action_states {
