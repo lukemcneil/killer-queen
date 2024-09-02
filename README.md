@@ -29,3 +29,4 @@ This is a clone of the killer queen arcade game. Play either by
 ## MIDI Keyboard as Controller
 
 You can also use a MIDI keyboard to serve as a controller for several players. On any octave, you can use C# or D# to join a team, C and D to move, and E to jump. You might have to tinker with `midi.rs` to correctly connect to the midi device. A keyboard turned turned out to be the perfect controller for this game, feeling like you are at the arcade playing on the actual cabinet.
+![midi-controller](https://github.com/user-attachments/assets/07537be3-df56-483b-838c-9205abef87f6)
