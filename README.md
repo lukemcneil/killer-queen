@@ -11,11 +11,12 @@ This is a clone of the killer queen arcade game. Play either by
 ## How to Play
 
 1. Connect as many gamepads as possible either through bluetooth or wired.
-2. Join the game with R or L to join as a worker or ZL or ZR to join as a queen. There should be only 1 queen per team.
+2. Join the game with R or L to join on the side you want. The first player to join on each side is the queen. Can also press select button to leave the game.
 3. To start the game, both queens need to go over the start gate. This will remove the temporary blocking platform.
 4. Controls once in the game-
     - left analog stick - move (you can wrap around the map where there is no wall)
     - south button (B on Switch) - jump as worker, fly as queen or fighter
+    - as the queen you can hold down on the left analog stick to dive
 5. How to win
     1. Economic - collect berries as workers and bring them back to your base.
     2. Ship - Ride the ship all the way to your side. Only workers can ride the ship, and they can jump off whenever they want.
@@ -24,3 +25,7 @@ This is a clone of the killer queen arcade game. Play either by
 7. Queens and fighters kill workers of the other team if they touch them. If queens and fighters come in contact, then there are two cases-
     1. One player lands on top of the other - the player on bottom dies.
     2. The players hit each others sides - if one player is facing the others back, then the player with the back turned dies.
+
+## MIDI Keyboard as Controller
+
+You can also use a MIDI keyboard to serve as a controller for several players. On any octave, you can use C# or D# to join a team, C and D to move, and E to jump. You might have to tinker with `midi.rs` to correctly connect to the midi device. A keyboard turned turned out to be the perfect controller for this game, feeling like you are at the arcade playing on the actual cabinet.
