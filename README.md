@@ -1,6 +1,6 @@
 # Killer Queen
 
-![](./assets/recording.mp4)
+https://github.com/lukemcneil/killer-queen/blob/main/assets/recording.mp4
 
 This is a clone of the killer queen arcade game. Play either by
 1. Cloning locally and running `cargo run --features bevy/dynamic_linking --release`
